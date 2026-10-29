@@ -12,9 +12,9 @@ void main(){
   if(uDust>0.5){vColor=aColor;vAlpha=aNormal.y;gl_PointSize=clamp(aNormal.x*uPointScale/max(0.01,gl_Position.w),1.0,18.0);}
 }`;
 const FS=`precision mediump float;
-varying vec3 vColor; varying float vDepth; varying float vAlpha; uniform float uFog;
+varying vec3 vColor; varying float vDepth; varying float vAlpha; uniform float uFog; uniform float uOpacity;
 void main(){float fog=1.0-exp(-vDepth*vDepth*0.00012*uFog);
- gl_FragColor=vec4(mix(vColor,vec3(0.54,0.64,0.64),min(fog,0.88)),vAlpha);}`;
+ gl_FragColor=vec4(mix(vColor,vec3(0.54,0.64,0.64),min(fog,0.88)),vAlpha*uOpacity);}`;
 // Unit cube triangles, expanded once. Dynamic boxes write directly into a reused
 // typed array, avoiding per-face position/normal arrays and Float32Array copies.
 const CUBE=[];
@@ -79,6 +79,7 @@ export class Renderer {
     this.attributes=['aPosition','aNormal','aColor'].map(n=>gl.getAttribLocation(program,n));
     this.vp=gl.getUniformLocation(program,'uVP');this.eye=gl.getUniformLocation(program,'uEye');this.fog=gl.getUniformLocation(program,'uFog');
     this.dust=gl.getUniformLocation(program,'uDust');this.pointScale=gl.getUniformLocation(program,'uPointScale');
+    this.opacity=gl.getUniformLocation(program,'uOpacity');
     this.dynamicMesh=new Mesh(65536);this.weaponMesh=new Mesh();this.dustMesh=new Mesh(4096);
     const mesh=new Mesh();
     for(const b of world.geometry)mesh.box(b.x,b.y,b.z,b.w,b.h,b.d,b.color);
@@ -119,11 +120,11 @@ export class Renderer {
     }
     gl.clearColor(0.54,0.64,0.64,1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
     const vp=multiply(perspective(fov*Math.PI/180,this.width/this.height),view(eye,yaw,pitch));this.lastVP=vp;
-    gl.uniformMatrix4fv(this.vp,false,vp);gl.uniform3fv(this.eye,eye);gl.uniform1f(this.fog,1);gl.uniform1f(this.dust,0);
+    gl.uniformMatrix4fv(this.vp,false,vp);gl.uniform3fv(this.eye,eye);gl.uniform1f(this.fog,1);gl.uniform1f(this.dust,0);gl.uniform1f(this.opacity,1);
     this.bind(this.staticBuffer);gl.drawArrays(gl.TRIANGLES,0,this.staticCount);
     const dynamic=this.dynamicMesh.clear();
     for(const b of game.bots)if(b.alive)this.bot(dynamic,b,game.time);
-    for(const t of effects.tracers)dynamic.line(t.origin,t.point,0.016,t.enemy?[1,0.35,0.16]:[1,0.91,0.62]);
+    for(const t of effects.tracers)dynamic.line(t.origin,t.point,t.enemy?0.012:0.004,t.enemy?[1,0.35,0.16]:[1,0.91,0.62]);
     this.drawMesh(dynamic);
     if(effects.particles.length){
       const dust=this.dustMesh.clear();
@@ -132,10 +133,12 @@ export class Renderer {
       gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE);gl.depthMask(false);this.drawMesh(dust,true);
       gl.depthMask(true);gl.disable(gl.BLEND);gl.uniform1f(this.dust,0);
     }
-    if(!menu&&w.ads<0.94){
+    if(!menu&&w.ads<0.7){
       gl.clear(gl.DEPTH_BUFFER_BIT);gl.uniformMatrix4fv(this.vp,false,perspective(64*Math.PI/180,this.width/this.height));
       gl.uniform3fv(this.eye,[0,0,0]);gl.uniform1f(this.fog,0);
-      this.drawMesh(this.weapon(game,reduced));
+      gl.uniform1f(this.opacity,Math.max(0,1-smooth(w.ads/0.7)));
+      gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
+      this.drawMesh(this.weapon(game,reduced));gl.disable(gl.BLEND);
     }
   }
   bot(mesh,b,time){

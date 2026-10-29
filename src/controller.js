@@ -16,6 +16,7 @@ export class XboxInput {
     const out=neutral();
     if(!pad){this.identity='';this.index=-1;this.reset();return out;}
     const identity=`${pad.index}:${pad.id}`;
+    out.replaced=!!this.identity&&identity!==this.identity;
     if(identity!==this.identity){this.reset();this.identity=identity;this.index=pad.index;}
     out.connected=true;
     const held=this.previous.map((was,i)=>{

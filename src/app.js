@@ -120,7 +120,7 @@ function pollController(){
   try{pad=controller.sample(navigator.getGamepads?.(),prefs.deadzone);}catch{pad={connected:false};}
   const message=pad.connected?'XBOX READY · RELEASE CONTROLS AFTER RESUMING':'XBOX: CONNECT, THEN PRESS A BUTTON';
   if(message!==controllerStatus){controllerStatus=message;$('controller-status').textContent=message;$('controller-settings-status').textContent=message;}
-  if(state==='playing'&&prefs.profile==='xbox'&&wasConnected&&!pad.connected){pauseGame();$('lock-message').textContent='Controller disconnected. Reconnect, release the controls, then resume.';return;}
+  if(state==='playing'&&prefs.profile==='xbox'&&((wasConnected&&!pad.connected)||pad.replaced)){pauseGame();$('lock-message').textContent='Controller disconnected or changed. Reconnect, release the controls, then resume.';return;}
   if(prefs.profile!=='xbox'||!pad.connected||document.hidden||!document.hasFocus())return;
   if(state==='playing'){
     if(pad.pause){pauseGame();return;}
@@ -151,10 +151,17 @@ function announce(title,subtitle='',seconds=1){
   announcementUntil=game.time+seconds;
 }
 function consumeEvents(){
+  let sounds=0;
   for(const event of game.drainEvents()){
-    sound.play(event.type);
+    // A collateral has one hit/kill cue plus its own flourish, not six identical
+    // waveforms stacked at full volume when several targets fall together.
+    const once=event.type==='hit'?1:event.type==='kill'?2:0;
+    if(!once||!(sounds&once))sound.play(event.type);sounds|=once;
     if(event.type==='shot'){
-      effects.tracers.push({origin:event.origin.map((v,i)=>v+(i===1?-0.12:0)),point:event.hit.end.point,life:0.075});
+      const end=event.hit.end,distance=end.distance;
+      // Start in front of the near plane, not at the eye: a ribbon crossing the
+      // camera clips into a huge triangle while scoped.
+      if(distance>0.2)effects.tracers.push({origin:event.origin.map((v,i)=>v+(end.point[i]-v)/distance*Math.min(0.9,distance/2)+(i===1?-0.12:0)),point:end.point,life:0.075});
       if(event.hit.end.kind==='wall')particles(event.hit.end.point,7,[0.85,0.78,0.52]);
     }
     if(event.type==='enemyShot')effects.tracers.push({...event,enemy:true,life:0.12});

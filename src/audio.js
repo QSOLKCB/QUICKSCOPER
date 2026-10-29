@@ -6,7 +6,11 @@ export class Sound {
     try{
       if(!this.context){
         const Audio=globalThis.AudioContext||globalThis.webkitAudioContext;if(!Audio)return;
-        this.context=new Audio();this.master=this.context.createGain();this.master.connect(this.context.destination);
+        this.context=new Audio();this.master=this.context.createGain();
+        this.compressor=this.context.createDynamicsCompressor();
+        this.compressor.threshold.value=-8;this.compressor.knee.value=12;this.compressor.ratio.value=8;
+        this.compressor.attack.value=0.003;this.compressor.release.value=0.15;
+        this.master.connect(this.compressor);this.compressor.connect(this.context.destination);
         this.musicGain=this.context.createGain();this.musicGain.gain.value=this.musicVolume;this.musicGain.connect(this.master);
         const n=this.context.sampleRate*0.4;this.noise=this.context.createBuffer(1,n,this.context.sampleRate);
         const a=this.noise.getChannelData(0);for(let i=0;i<n;i++)a[i]=Math.random()*2-1;

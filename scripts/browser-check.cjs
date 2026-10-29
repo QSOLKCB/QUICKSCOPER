@@ -77,17 +77,17 @@ const assert=require('node:assert/strict');
     const controllerContext=await browser.newContext({viewport:{width:1440,height:900},serviceWorkers:'block'});
     page=await controllerContext.newPage();page.on('pageerror',error=>errors.push(error.message));
     const appSource=await readFile(resolve(root,'src/app.js'),'utf8');
-    await page.route('**/src/app.js',route=>route.fulfill({contentType:'text/javascript',body:appSource+'\nglobalThis.__qa={get game(){return game},effects,sound};'}));
+    await page.route('**/src/app.js',route=>route.fulfill({contentType:'text/javascript',body:appSource+'\nglobalThis.__qa={get game(){return game},get pad(){return pad},controller,effects,sound};'}));
     await page.addInitScript(()=>{
       window.__pad={index:0,id:'Xbox standard smoke fixture',mapping:'standard',connected:true,axes:[0,0,0,0],buttons:Array.from({length:17},()=>({value:0,pressed:false}))};
-      Object.defineProperty(navigator,'getGamepads',{value:()=>window.__pad.connected?[window.__pad]:[]});
+      window.__padPolls=0;Object.defineProperty(navigator,'getGamepads',{value:()=>{window.__padPolls++;return window.__pad.connected?[window.__pad]:[];}});
     });
     await page.goto(url);await page.waitForFunction(()=>window.__qa&&document.getElementById('controller-status').textContent.includes('READY'));
     await page.locator('#profile').selectOption('xbox');await page.locator('#mode-practice').click();await page.locator('#start').click();
     await page.waitForFunction(()=>document.getElementById('menu').hidden&&document.getElementById('pause').hidden);
     assert.equal(await page.evaluate(()=>document.pointerLockElement),null);
-    const padButton=async(index,value)=>page.evaluate(({index,value})=>{window.__pad.buttons[index]={value,pressed:value>0.5};},{index,value});
-    const release=async()=>{await page.evaluate(()=>{window.__pad.axes.fill(0);for(const b of window.__pad.buttons){b.value=0;b.pressed=false;}});await page.waitForTimeout(80);};
+    const padButton=async(index,value)=>{const poll=await page.evaluate(({index,value})=>{window.__pad.buttons[index]={value,pressed:value>0.5};return window.__padPolls;},{index,value});await page.waitForFunction(n=>window.__padPolls>n,poll);};
+    const release=async()=>{const poll=await page.evaluate(()=>{window.__pad.axes.fill(0);for(const b of window.__pad.buttons){b.value=0;b.pressed=false;}return window.__padPolls;});await page.waitForFunction(n=>window.__padPolls>n&&!window.__qa.controller.blocked&&window.__qa.controller.previous.every(b=>!b),poll);};
     await release();
     await page.evaluate(()=>{
       const g=window.__qa.game;g.player.pitch=Math.atan2(1.2-1.68,10);
@@ -135,7 +135,7 @@ const assert=require('node:assert/strict');
     await fallback.goto(url);await fallback.locator('#error').waitFor({state:'visible'});assert.equal(await fallback.locator('#start').isDisabled(),true);
     console.log('Unsupported graphics: actionable error and disabled launch: PASS');
   }catch(error){
-    if(page){await page.screenshot({path:'artifacts/failure.png'}).catch(()=>{});console.error('Visible state:',await page.locator('body').innerText().catch(()=>''));console.error('Pointer lock:',await page.evaluate(()=>document.pointerLockElement?.id).catch(()=>''));}
+    if(page){await page.screenshot({path:'artifacts/failure.png'}).catch(()=>{});console.error('Visible state:',await page.locator('body').innerText().catch(()=>''));console.error('Pointer lock:',await page.evaluate(()=>document.pointerLockElement?.id).catch(()=>''));console.error('Controller state:',await page.evaluate(()=>window.__qa?{pad:window.__qa.pad,blocked:window.__qa.controller.blocked,polls:window.__padPolls,weapon:window.__qa.game.weapon,focus:document.hasFocus()}:null).catch(()=>null));}
     throw error;
   }finally{await browser?.close();await new Promise(r=>server.close(r));}
 })().catch(error=>{console.error(error);process.exitCode=1;});

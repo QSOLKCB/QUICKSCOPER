@@ -84,7 +84,7 @@ test('Xbox triggers use edge detection and hysteresis, with explicit standard ma
 test('controller resume, disconnect and replacement require neutral input before firing',()=>{
   const p=pad(),c=new XboxInput();c.sample([p]);press(p,7);assert.equal(c.sample([p]).fire,true);c.reset();assert.equal(c.sample([p]).fire,false);
   press(p,7,0);c.sample([p]);press(p,7);assert.equal(c.sample([p]).fire,true);c.sample([]);assert.equal(c.sample([p]).fire,false);
-  press(p,7,0);c.sample([p]);p.id='Replacement';press(p,7);assert.equal(c.sample([p]).fire,false);
+  press(p,7,0);c.sample([p]);p.id='Replacement';press(p,7);const replaced=c.sample([p]);assert.equal(replaced.fire,false);assert.equal(replaced.replaced,true);
 });
 test('Xbox buttons and sticks map to gameplay and menu actions',()=>{
   const p=pad(),c=new XboxInput();c.sample([p]);p.axes=[0.58,-1,0.8,-0.8];for(const i of [0,1,2,9,10,12,15])press(p,i);
