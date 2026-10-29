@@ -18,10 +18,10 @@ const assert=require('node:assert/strict');
   });
   await new Promise(r=>server.listen(0,'127.0.0.1',r));
   const url=`http://127.0.0.1:${server.address().port}${base}`;
-  let browser;
+  let browser,page;
   try{
     browser=await chromium.launch({headless:true,args:['--use-angle=swiftshader','--enable-unsafe-swiftshader']});
-    const context=await browser.newContext({viewport:{width:1440,height:900}}),page=await context.newPage();
+    const context=await browser.newContext({viewport:{width:1440,height:900}});page=await context.newPage();
     const errors=[],badResponses=[];page.on('pageerror',error=>errors.push(error.message));
     page.on('response',response=>{if(response.status()>=400)badResponses.push(response.url());});
     await page.goto(url);await page.waitForFunction(()=>!document.getElementById('start').disabled);
@@ -37,27 +37,31 @@ const assert=require('node:assert/strict');
       }));
     });
     assert.ok(rendered.colors>15,`Scene must render varied world pixels, got ${rendered.colors}`);assert.equal(rendered.error,0);
+    console.log('Scene rendering and offline install: PASS');
     await page.locator('#mode-practice').click();await page.locator('#start').click();
-    await page.waitForFunction(()=>document.pointerLockElement?.id==='world');
+    await page.waitForFunction(()=>document.pointerLockElement?.id==='world'&&document.getElementById('pause').hidden);
     await page.waitForFunction(()=>document.getElementById('pause').hidden);
     // Fire / cycle / reload using normal input, without mutating simulation state.
-    await page.mouse.click(720,450);await page.waitForFunction(()=>document.getElementById('ammo').textContent==='04');
+    await page.mouse.down();await page.mouse.up();await page.waitForFunction(()=>document.getElementById('ammo').textContent==='04');
     await page.mouse.down({button:'right'});await page.waitForFunction(()=>document.getElementById('scope-tip').textContent.includes('AIM'));
     await page.screenshot({path:'artifacts/quickscoper-scope.png'});await page.mouse.up({button:'right'});
     await page.keyboard.press('r');await page.waitForFunction(()=>document.getElementById('ammo').textContent==='05');
     await page.screenshot({path:'artifacts/quickscoper-game.png'});
+    console.log('Firing, scope and reload: PASS');
     await page.keyboard.down('w');await page.waitForTimeout(250);await page.keyboard.up('w');
     await page.keyboard.press('p');await page.locator('#pause').waitFor({state:'visible'});
     const before=await page.locator('#time').textContent();await page.waitForTimeout(250);assert.equal(await page.locator('#time').textContent(),before);
-    await page.locator('#restart').click();await page.waitForFunction(()=>document.pointerLockElement?.id==='world');
+    console.log('Initial pause: PASS');
+    await page.locator('#restart').click();await page.waitForFunction(()=>document.pointerLockElement?.id==='world'&&document.getElementById('pause').hidden);
     assert.equal(await page.locator('#ammo').textContent(),'05');assert.equal(await page.locator('#score').textContent(),'000000');
-    await page.keyboard.press('p');await page.locator('#quit').click();
+    await page.keyboard.press('p');await page.locator('#pause').waitFor({state:'visible'});await page.locator('#quit').click();
+    console.log('Restart, pause and menu return: PASS');
     await page.locator('#settings-open').click();await page.locator('#reduced').check();await page.getByRole('button',{name:'ALL SET'}).click();
     // Cached repository-subpath navigation must still boot with networking disabled.
     await context.setOffline(true);await page.reload();await page.locator('#start').waitFor({state:'visible'});
     assert.equal(await page.locator('#start').isEnabled(),true);
     await page.locator('#settings-open').click();assert.equal(await page.locator('#reduced').isChecked(),true);await page.getByRole('button',{name:'ALL SET'}).click();
-    await page.locator('#start').click();await page.waitForFunction(()=>document.pointerLockElement?.id==='world');
+    await page.locator('#start').click();await page.waitForFunction(()=>document.pointerLockElement?.id==='world'&&document.getElementById('pause').hidden);
     await page.keyboard.press('p');await page.locator('#pause').waitFor({state:'visible'});
     assert.deepEqual(errors,[]);assert.deepEqual(badResponses,[]);
     console.log('Chromium: rendered world pixels; mouse capture; firing; scope; reload; movement; pause; restart; persisted settings; offline subpath reload: PASS');
@@ -67,5 +71,8 @@ const assert=require('node:assert/strict');
     await fallback.addInitScript(()=>{const original=HTMLCanvasElement.prototype.getContext;HTMLCanvasElement.prototype.getContext=function(type,...rest){return type.startsWith('webgl')?null:original.call(this,type,...rest);};});
     await fallback.goto(url);await fallback.locator('#error').waitFor({state:'visible'});assert.equal(await fallback.locator('#start').isDisabled(),true);
     console.log('Unsupported graphics: actionable error and disabled launch: PASS');
+  }catch(error){
+    if(page){await page.screenshot({path:'artifacts/failure.png'}).catch(()=>{});console.error('Visible state:',await page.locator('body').innerText().catch(()=>''));console.error('Pointer lock:',await page.evaluate(()=>document.pointerLockElement?.id).catch(()=>''));}
+    throw error;
   }finally{await browser?.close();await new Promise(r=>server.close(r));}
 })().catch(error=>{console.error(error);process.exitCode=1;});
