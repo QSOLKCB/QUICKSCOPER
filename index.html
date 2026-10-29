@@ -26,14 +26,16 @@
         <button id="mode-run" class="mode active" aria-pressed="true"><span class="mode-no">01</span><span><strong>THE CIRCUIT</strong><small>90 seconds · score attack</small></span><span class="mode-indicator">↗</span></button>
         <button id="mode-practice" class="mode" aria-pressed="false"><span class="mode-no">02</span><span><strong>FREE RANGE</strong><small>No timer · no incoming fire</small></span><span class="mode-indicator">↗</span></button>
       </div>
+      <div class="profile-row"><label for="profile">CONTROLS</label><select id="profile"><option value="mouse">Keyboard + mouse</option><option value="xbox">Xbox controller</option></select></div>
       <div class="launch-row"><button id="start" class="primary">ENTER THE YARD <span>↗</span></button><button id="settings-open" class="icon-button" aria-label="Open settings">⚙</button></div>
-      <p id="menu-note" class="micro">DESKTOP + MOUSE REQUIRED <span>·</span> ESC TO PAUSE</p>
+      <p id="menu-note" class="micro">KEYBOARD + MOUSE · ESC TO PAUSE</p>
+      <p id="controller-status" class="micro" role="status">XBOX: CONNECT, THEN PRESS A BUTTON</p>
       <p id="error" class="error" role="alert" hidden></p>
     </section>
     <aside class="location-card"><span class="cross-corner">+</span><span class="eyebrow">TRAINING GROUND / 001</span><h2>THE SWITCHYARD</h2><p>Open sightlines. Close calls.</p><div class="location-meta"><span>ORIGINAL ARENA</span><span>48 × 60 M</span></div></aside>
     <footer class="menu-footer">
-      <div class="control-guide"><span><kbd>W A S D</kbd> MOVE</span><span><kbd>RMB</kbd> SCOPE</span><span><kbd>LMB</kbd> FIRE</span><span><kbd>R</kbd> RELOAD</span><button id="help-open" class="text-button">ALL CONTROLS ↗</button></div>
-      <div class="footer-meta"><span id="offline-status">OFFLINE COPY PENDING</span><span id="best-score">PERSONAL BEST —</span><span>QSOL–IMC / v0.1.0</span></div>
+      <div class="control-guide"><span><kbd id="guide-move">W A S D</kbd> MOVE</span><span><kbd id="guide-aim">RMB</kbd> SCOPE</span><span><kbd id="guide-fire">LMB</kbd> FIRE</span><span><kbd id="guide-reload">R</kbd> RELOAD</span><button id="help-open" class="text-button">ALL CONTROLS ↗</button></div>
+      <div class="footer-meta"><span id="offline-status">OFFLINE COPY PENDING</span><span id="best-score">PERSONAL BEST —</span><span>QSOL–IMC / v0.2.0</span></div>
     </footer>
   </main>
 
@@ -53,9 +55,28 @@
     <div class="panel results-panel"><p class="eyebrow">CIRCUIT COMPLETE</p><h2 id="results-title">NICE SHOOTING.</h2><div class="result-score"><span id="final-score">0</span><small id="record-label">FINAL SCORE</small></div><div id="results-grid" class="results-grid"></div><p id="rank" class="rank"></p><button id="play-again" class="primary">RUN IT BACK <span>↗</span></button><button id="results-menu" class="text-button">RETURN TO MENU</button></div>
   </section>
 
-  <dialog id="settings" class="panel settings-panel"><form method="dialog"><button class="close" aria-label="Close settings">×</button><p class="eyebrow">DIAL IT IN</p><h2>YOUR SETUP.</h2><label for="sensitivity">Mouse sensitivity <output id="sens-output">1.00</output></label><input id="sensitivity" type="range" min="0.3" max="2.5" step="0.05" value="1"><label for="volume">Sound volume <output id="volume-output">45%</output></label><input id="volume" type="range" min="0" max="1" step="0.05" value="0.45"><label class="checkbox"><input id="invert" type="checkbox"> Invert vertical look</label><label class="checkbox"><input id="reduced" type="checkbox"> Reduced motion & flashes</label><label class="checkbox"><input id="low-quality" type="checkbox"> Lower render resolution</label><p class="micro">Settings and personal best stay on this device.</p><button class="primary">ALL SET <span>✓</span></button></form></dialog>
+  <dialog id="settings" class="panel settings-panel"><form method="dialog">
+    <button class="close" aria-label="Close settings">×</button><p class="eyebrow">DIAL IT IN</p><h2>YOUR SETUP.</h2>
+    <label for="control-profile">Control profile</label><select id="control-profile"><option value="mouse">Keyboard + mouse</option><option value="xbox">Xbox controller</option></select>
+    <p id="controller-settings-status" class="micro" role="status"></p>
+    <label for="sensitivity">Mouse sensitivity <output id="sens-output">1.00</output></label><input id="sensitivity" type="range" min="0.3" max="2.5" step="0.05" value="1">
+    <label for="pad-sensitivity">Controller look speed <output id="pad-output">1.00</output></label><input id="pad-sensitivity" type="range" min="0.3" max="2.5" step="0.05" value="1">
+    <label for="deadzone">Stick deadzone <output id="deadzone-output">16%</output></label><input id="deadzone" type="range" min="0.05" max="0.35" step="0.01" value="0.16">
+    <label for="volume">Master volume <output id="volume-output">45%</output></label><input id="volume" type="range" min="0" max="1" step="0.05" value="0.45">
+    <label for="music-volume">Math music <output id="music-output">30%</output></label><input id="music-volume" type="range" min="0" max="1" step="0.05" value="0.3">
+    <p class="micro">108 BPM · generated from repeating number patterns. More layers join your streak. Set to 0% for effects only.</p>
+    <label class="checkbox"><input id="invert" type="checkbox"> Invert vertical look</label><label class="checkbox"><input id="reduced" type="checkbox"> Reduced motion & flashes</label><label class="checkbox"><input id="low-quality" type="checkbox"> Lower resolution & fewer particles</label>
+    <p class="micro">Settings and personal best stay on this device.</p><button class="primary">ALL SET <span>✓</span></button>
+  </form></dialog>
 
-  <dialog id="help" class="panel help-panel"><form method="dialog"><button class="close" aria-label="Close controls">×</button><p class="eyebrow">THE FIELD MANUAL</p><h2>MAKE IT QUICK.</h2><p>Hold the right mouse button to scope, line up, then click left. Your rifle settles after <b>160 ms</b>. Land the shot before <b>550 ms</b> for a quickscope bonus.</p><div class="help-controls"><span>Move</span><kbd>W A S D / ARROWS</kbd><span>Look / Fire</span><kbd>MOUSE / LEFT CLICK</kbd><span>Hold scope</span><kbd>RIGHT CLICK</kbd><span>Sprint / Jump</span><kbd>SHIFT / SPACE</kbd><span>Crouch / Reload</span><kbd>C or CTRL / R</kbd><span>Mute / Pause</span><kbd>M / ESC or P</kbd></div><p>A torso or head hit drops a bot; legs take two hits. Chain eliminations within <b>3.1 seconds</b> for up to <b>5×</b> points. Watch for orange charge bars—get behind cover before the bots fire.</p><p class="micro">ELIMINATION +100 · HEADSHOT +50 · QUICKSCOPE +100<br>RESPAWN −200 · HEALTH REGENERATES AFTER 3.5 SECONDS</p><button class="primary">GOT IT <span>↗</span></button></form></dialog>
+  <dialog id="help" class="panel help-panel"><form method="dialog"><button class="close" aria-label="Close controls">×</button><p class="eyebrow">THE FIELD MANUAL</p><h2>MAKE IT QUICK.</h2>
+    <p>Hold scope, line up, then fire. Your rifle settles after <b>150 ms</b>. Land the shot before <b>550 ms</b> for a quickscope bonus. Slightly early clicks wait for the scope to settle. One shot per click or trigger pull.</p>
+    <div class="help-controls"><span>Action</span><b>KEYBOARD / XBOX</b><span>Move</span><kbd>WASD / LEFT STICK</kbd><span>Look</span><kbd>MOUSE / RIGHT STICK</kbd><span>Scope / Fire</span><kbd>RMB + LMB / LT + RT</kbd><span>Jump</span><kbd>SPACE / A</kbd><span>Hold sprint</span><kbd>SHIFT / LEFT STICK CLICK</kbd><span>Hold crouch</span><kbd>C or CTRL / B or RS CLICK</kbd><span>Reload</span><kbd>R / X</kbd><span>Pause</span><kbd>ESC or P / MENU</kbd><span>Menu navigation</span><kbd>D-PAD / A SELECT / B BACK</kbd></div>
+    <p>Select the Xbox profile and press a controller button to connect. Release controls after entering or resuming. D-pad up/down moves between menu items; left/right changes sliders and lists. Click the page once to enable audio if your browser requires it.</p>
+    <p>A torso or head hit drops a bot; limbs take two hits. <b>Line up enemies for collaterals:</b> your shot passes through bots and stops at cover. Two or more kills in one shot earn <b>+150 per extra kill</b>, alongside normal points.</p>
+    <p>Chain eliminations within <b>3.1 seconds</b> for up to <b>5×</b> points. Bots now close distance, flank and dodge after a hit. Their orange charge bars give you time to take cover.</p>
+    <p class="micro">ELIMINATION +100 · HEADSHOT +50 · QUICKSCOPE +100<br>RESPAWN −200 · HEALTH REGENERATES AFTER 3.5 SECONDS<br>M TO MUTE · TOUCH CONTROLS NOT INCLUDED</p><button class="primary">GOT IT <span>↗</span></button>
+  </form></dialog>
   <noscript><div class="noscript">QUICKSCOPER needs JavaScript enabled to run the game.</div></noscript>
   <script type="module" src="./src/app.js"></script>
 </body>

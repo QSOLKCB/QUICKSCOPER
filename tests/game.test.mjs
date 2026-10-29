@@ -41,7 +41,7 @@ test('scoped chest kill consumes one round and awards quickscope points',()=>{
  assert.equal(g.shoot().part,'body');assert.equal(g.stats.score,200);assert.equal(g.stats.quick,1);assert.equal(g.weapon.ammo,4);assert.equal(g.stats.kills,1);
 });
 test('quickscope bonus uses both timing boundaries; holding scope is still accurate',()=>{
- for(const [time,quick]of [[0.16,1],[0.55,1],[0.56,0]]){const g=targetGame();g.weapon.aiming=true;g.weapon.adsTime=time;g.shoot();assert.equal(g.stats.quick,quick);assert.equal(g.stats.hits,1);}
+ for(const [time,quick]of [[RULES.quickStart,1],[RULES.quickEnd,1],[0.56,0]]){const g=targetGame();g.weapon.aiming=true;g.weapon.adsTime=time;g.shoot();assert.equal(g.stats.quick,quick);assert.equal(g.stats.hits,1);}
 });
 test('headshot bonus stacks with quickscope and leg hits require two shots',()=>{
  const g=targetGame();g.player.pitch=Math.atan2(1.93-1.68,10);g.weapon.aiming=true;g.weapon.adsTime=0.2;g.shoot();assert.equal(g.stats.score,250);assert.equal(g.stats.heads,1);
