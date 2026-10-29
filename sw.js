@@ -1,9 +1,9 @@
 // Increment this revision whenever any cached runtime file changes.
-const REVISION='v0.1.0-2';
+const REVISION='v0.2.0-1';
 // Scope-specific prefix prevents interference with other games on the same Pages origin.
 const PREFIX=`quickscoper:${self.registration.scope}:`;
 const CACHE=PREFIX+REVISION;
-const FILES=['./','./index.html','./style.css','./icon.svg','./manifest.webmanifest','./src/app.js','./src/math.js','./src/world.js','./src/game.js','./src/renderer.js','./src/audio.js'];
+const FILES=['./','./index.html','./style.css','./icon.svg','./manifest.webmanifest','./src/app.js','./src/math.js','./src/world.js','./src/game.js','./src/renderer.js','./src/audio.js','./src/controller.js','./src/music.js','./src/navigation.js'];
 self.addEventListener('install',event=>{
   event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(FILES)));
   // Let an existing game finish. Updates activate after all old game tabs close.

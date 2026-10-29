@@ -4,41 +4,48 @@
 
 [Play QUICKSCOPER](https://qsolkcb.github.io/QUICKSCOPER/)
 
-The first release turns the design brief in [IMPLEMENTATION.md](IMPLEMENTATION.md) into a complete game. That document is preserved as the original concept and unfinished sketch; the playable implementation lives in `index.html`, `style.css`, and `src/`.
+The game turns the design brief in [IMPLEMENTATION.md](IMPLEMENTATION.md) into a complete game. That document is preserved as the original concept and unfinished sketch; the playable implementation lives in `index.html`, `style.css`, and `src/`.
 
 ## The game
 
 - **The Circuit:** a 90-second score attack against six moving voxel training bots. Watch their orange charge bars, dodge shots, use cover, and chain eliminations.
 - **Free Range:** unlimited practice with incoming fire disabled.
 - **The Switchyard:** an original industrial arena with three connected lanes, containers, crates, low cover, gantries, and distant skyline geometry.
-- **QS–01:** a five-round bolt-action rifle with a 190 ms visual scope-in, 820 ms bolt cycle, 1.85-second reload, and unlimited reserve magazines.
+- **QS–01:** a five-round bolt-action rifle with a 150 ms scope-in, 820 ms bolt cycle, 1.85-second reload, and unlimited reserve magazines.
 - Precise head, torso, and limb hits; solid cover; normalized movement, sprinting, jumping, and crouching.
-- Synthesized weapon and hit sounds, animated rifle and bolt, hitmarkers, voxel fragments, tracers, combo feedback, a results screen, and a local personal best.
+- Collateral hits through aligned bots, multi-kill bonuses, digital dust explosions, tracers, hitmarkers and local records.
+- Original procedural music at 108 BPM: Euclidean rhythms and modular minor-pentatonic melodies. Streaks add layers; music has its own volume control.
+- Xbox controller profile with analog movement, adjustable look speed/deadzone, slower scoped aim and controller-operated menus.
+- Bots close distance, strafe, find routes around cover and dodge after surviving a hit. Flankers move faster, with distinct blue armor.
 
 ### Find the rhythm
 
-Hold right mouse to raise the scope, line up, and click left. Shots become accurate after **160 ms** of uninterrupted scope time. A kill between **160–550 ms** earns a quickscope bonus. Holding the scope longer stays accurate; hip-fire has spread. The rifle lowers during cycling and reloads. A held right button raises it again once the bolt is ready.
+Hold right mouse to raise the scope, line up, and click left. The visual scope and shot accuracy settle together after **150 ms** of uninterrupted scope time. A kill between **150–550 ms** earns a quickscope bonus. Holding the scope longer stays accurate; hip-fire has spread. The rifle lowers during cycling and reloads, then starts raising during the final 150 ms of the bolt cycle if scope is held. A trigger press up to **180 ms** early can wait for readiness. Releasing scope, pausing, reloading or respawning cancels a pending shot. Holding fire never repeats shots automatically.
 
-A torso or head hit eliminates a bot; limbs take two hits. Base elimination: **100 points**, headshot: **+50**, quickscope: **+100**. Eliminations within **3.1 seconds** extend a chain, multiplying points up to **5×**. In the Circuit, being downed costs **200 points** and respawns you with a loaded rifle and brief protection. Health regenerates after **3.5 seconds** without damage.
+A torso or head hit eliminates a bot; limbs take two hits. Bullets pass through every intersected bot, hitting each once, and stop at the first solid surface. Two or more kills with one round earn a **collateral bonus of 150 points per extra kill**. Accuracy counts successful shots, so a collateral cannot inflate it above 100%. Base elimination: **100 points**, headshot: **+50**, quickscope: **+100**. Eliminations within **3.1 seconds** extend a chain, multiplying points up to **5×**. In the Circuit, being downed costs **200 points** and respawns you with a loaded rifle and brief protection. Health regenerates after **3.5 seconds** without damage.
 
 ## Controls
 
-Desktop keyboard and mouse are required. Touch and gamepad controls are not included.
+Choose **Keyboard + mouse** or **Xbox controller** above the start button or in Settings. Xbox uses the browser's standard Gamepad mapping over USB or Bluetooth. Connect it, press a button to expose it to the browser, then release the controls. Unmapped devices are not guessed. Touch controls are not included.
 
-| Action | Input |
-| --- | --- |
-| Move | WASD or arrow keys |
-| Look | Mouse |
-| Fire | Left click; one shot per click when bolt is ready |
-| Hold scope | Right mouse button |
-| Sprint | Shift |
-| Jump | Space |
-| Crouch | Hold C or Ctrl |
-| Reload | R |
-| Mute | M |
-| Pause / release mouse | Esc or P |
+| Action | Keyboard + mouse | Xbox profile |
+| --- | --- | --- |
+| Move | WASD / arrows | Left stick, analog |
+| Look | Mouse | Right stick |
+| Fire | Left click | RT, one shot per pull |
+| Hold scope | Right mouse | LT |
+| Hold sprint | Shift | Left stick click |
+| Jump | Space | A |
+| Hold crouch | C / Ctrl | B / right stick click |
+| Reload | R | X |
+| Pause / resume | Esc or P / click Resume | Menu / A on Resume |
+| Navigate menus | Mouse / Tab | D-pad up/down; A selects; B closes dialogs |
+| Change sliders / profile | Mouse / arrows | D-pad left/right |
+| Mute | M | Master volume in Settings |
 
-Losing focus, changing tabs, or releasing pointer lock pauses the simulation. Resume requires a deliberate click. Settings include mouse sensitivity, inverted vertical aim, sound volume, reduced motion/flashes, and lower render resolution. Settings and the Circuit best score are stored only on your device.
+Losing focus or changing tabs pauses the simulation. Mouse mode also pauses on pointer unlock; Xbox mode does not require mouse capture and pauses on controller disconnect. Resume is deliberate, and controller inputs must return to neutral to prevent held triggers carrying into the next screen. Click the page once to enable audio if the browser blocks controller-only activation.
+
+Settings include separate mouse/controller sensitivities, stick deadzone, inverted look, master volume, music volume, reduced motion/flashes and lower render resolution/particle count. Settings and the Circuit best score stay on your device.
 
 ## Offline play
 
@@ -63,7 +70,7 @@ npm run check
 npm run build
 ```
 
-`dist/` contains only the distributable game and license. `scripts/browser-check.cjs` uses Playwright as isolated CI tooling, not a game dependency. The workflow runs Chromium rendering/input tests, captures screenshots, and checks offline reload at `/QUICKSCOPER/` before deploying.
+`dist/` contains only the distributable game and license. `npm run benchmark` measures CPU mesh construction (not GPU FPS). `scripts/browser-check.cjs` uses Playwright as isolated CI tooling, not a game dependency. The workflow runs Chromium rendering/input tests, captures screenshots, and checks offline reload at `/QUICKSCOPER/` before deploying. It also emulates Xbox inputs through the real app, verifies collateral scoring/data-dust rendering and music lifecycle, and checks WebGL 1 fallback. Physical controller hardware and real GPU performance still need human playtesting.
 
 ## GitHub Pages
 
@@ -77,7 +84,9 @@ Set **Settings → Pages → Build and deployment → Source → GitHub Actions*
 | `src/world.js` | Original arena geometry and collision boxes |
 | `src/game.js` | Pure fixed-step simulation, movement, weapon, scoring, bots |
 | `src/renderer.js` | Raw WebGL shaders, batched geometry, voxel models and rifle |
-| `src/audio.js` | Local Web Audio synthesis |
+| `src/controller.js` | Standard Xbox mapping, radial deadzones and edge detection |
+| `src/navigation.js` | Shared cached flow field for cover navigation |
+| `src/audio.js`, `src/music.js` | Local sound synthesis and mathematical music sequencing |
 | `src/app.js` | Input, lifecycle, Canvas overlay, HUD, settings and effects |
 | `sw.js` | Scope-isolated offline cache |
 

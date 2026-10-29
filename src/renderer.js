@@ -1,33 +1,46 @@
-import {clamp, mix, smooth, perspective, view, multiply, transform} from './math.js';
+import {mix, smooth, perspective, view, multiply, transform} from './math.js';
 const VS=`attribute vec3 aPosition; attribute vec3 aNormal; attribute vec3 aColor;
-uniform mat4 uVP; uniform vec3 uEye;
-varying vec3 vColor; varying float vDepth;
+uniform mat4 uVP; uniform vec3 uEye; uniform float uDust; uniform float uPointScale;
+varying vec3 vColor; varying float vDepth; varying float vAlpha;
 void main(){
   float sunlight=max(dot(aNormal,normalize(vec3(-0.5,0.85,0.35))),0.0);
   float sky=max(aNormal.y,0.0)*0.13;
   vColor=aColor*(0.57+sunlight*0.48+sky);
   vDepth=length(aPosition-uEye);
   gl_Position=uVP*vec4(aPosition,1.0);
+  vAlpha=1.0;gl_PointSize=1.0;
+  if(uDust>0.5){vColor=aColor;vAlpha=aNormal.y;gl_PointSize=clamp(aNormal.x*uPointScale/max(0.01,gl_Position.w),1.0,18.0);}
 }`;
 const FS=`precision mediump float;
-varying vec3 vColor; varying float vDepth; uniform float uFog;
+varying vec3 vColor; varying float vDepth; varying float vAlpha; uniform float uFog;
 void main(){float fog=1.0-exp(-vDepth*vDepth*0.00012*uFog);
- gl_FragColor=vec4(mix(vColor,vec3(0.54,0.64,0.64),min(fog,0.88)),1.0);}`;
-class Mesh {
-  constructor(){this.data=[];}
-  vertex(p,n,c){this.data.push(...p,...n,...c);}
-  quad(a,b,c,d,n,color){for(const p of [a,b,c,a,c,d])this.vertex(p,n,color);}
-  box(x,y,z,w,h,d,color,angle=0){
-    const sn=Math.sin(angle),cs=Math.cos(angle);
-    const pt=(a,b,c)=>[x+a*cs+c*sn,y+b,z-a*sn+c*cs];
-    const norm=(a,b,c)=>[a*cs+c*sn,b,-a*sn+c*cs];
-    const a=w/2,b=h/2,c=d/2;
-    this.quad(pt(-a,b,c),pt(a,b,c),pt(a,b,-c),pt(-a,b,-c),norm(0,1,0),color);
-    this.quad(pt(-a,-b,-c),pt(a,-b,-c),pt(a,-b,c),pt(-a,-b,c),norm(0,-1,0),color);
-    this.quad(pt(-a,-b,c),pt(a,-b,c),pt(a,b,c),pt(-a,b,c),norm(0,0,1),color);
-    this.quad(pt(a,-b,-c),pt(-a,-b,-c),pt(-a,b,-c),pt(a,b,-c),norm(0,0,-1),color);
-    this.quad(pt(a,-b,c),pt(a,-b,-c),pt(a,b,-c),pt(a,b,c),norm(1,0,0),color);
-    this.quad(pt(-a,-b,-c),pt(-a,-b,c),pt(-a,b,c),pt(-a,b,-c),norm(-1,0,0),color);
+ gl_FragColor=vec4(mix(vColor,vec3(0.54,0.64,0.64),min(fog,0.88)),vAlpha);}`;
+// Unit cube triangles, expanded once. Dynamic boxes write directly into a reused
+// typed array, avoiding per-face position/normal arrays and Float32Array copies.
+const CUBE=[];
+for(const [normal,corners] of [
+ [[0,1,0],[[-1,1,1],[1,1,1],[1,1,-1],[-1,1,-1]]],
+ [[0,-1,0],[[-1,-1,-1],[1,-1,-1],[1,-1,1],[-1,-1,1]]],
+ [[0,0,1],[[-1,-1,1],[1,-1,1],[1,1,1],[-1,1,1]]],
+ [[0,0,-1],[[1,-1,-1],[-1,-1,-1],[-1,1,-1],[1,1,-1]]],
+ [[1,0,0],[[1,-1,1],[1,-1,-1],[1,1,-1],[1,1,1]]],
+ [[-1,0,0],[[-1,-1,-1],[-1,-1,1],[-1,1,1],[-1,1,-1]]]
+])for(const i of [0,1,2,0,2,3])CUBE.push(...corners[i],...normal);
+export class Mesh {
+  constructor(capacity=32768){this.data=new Float32Array(capacity);this.length=0;}
+  clear(){this.length=0;return this;}
+  reserve(count){if(this.length+count<=this.data.length)return;let size=this.data.length;while(size<this.length+count)size*=2;const next=new Float32Array(size);next.set(this.data);this.data=next;}
+  vertex(p,n,c){this.reserve(9);const d=this.data;let i=this.length;d[i++]=p[0];d[i++]=p[1];d[i++]=p[2];d[i++]=n[0];d[i++]=n[1];d[i++]=n[2];d[i++]=c[0];d[i++]=c[1];d[i++]=c[2];this.length=i;}
+  quad(a,b,c,d,n,color){this.vertex(a,n,color);this.vertex(b,n,color);this.vertex(c,n,color);this.vertex(a,n,color);this.vertex(c,n,color);this.vertex(d,n,color);}
+  box(x,y,z,w,h,depth,color,angle=0){
+    this.reserve(324);const sn=Math.sin(angle),cs=Math.cos(angle),data=this.data;let j=this.length;
+    for(let i=0;i<CUBE.length;i+=6){
+      const a=CUBE[i]*w/2,b=CUBE[i+1]*h/2,c=CUBE[i+2]*depth/2,nx=CUBE[i+3],ny=CUBE[i+4],nz=CUBE[i+5];
+      data[j++]=x+a*cs+c*sn;data[j++]=y+b;data[j++]=z-a*sn+c*cs;
+      data[j++]=nx*cs+nz*sn;data[j++]=ny;data[j++]=-nx*sn+nz*cs;
+      data[j++]=color[0];data[j++]=color[1];data[j++]=color[2];
+    }
+    this.length=j;
   }
   cylinder(x,y,z,r,length,color,segments=12){
     // Along Z; used for the barrel, optic housing and muzzle.
@@ -65,13 +78,15 @@ export class Renderer {
     gl.deleteShader(vs);gl.deleteShader(fs);gl.useProgram(program);this.program=program;
     this.attributes=['aPosition','aNormal','aColor'].map(n=>gl.getAttribLocation(program,n));
     this.vp=gl.getUniformLocation(program,'uVP');this.eye=gl.getUniformLocation(program,'uEye');this.fog=gl.getUniformLocation(program,'uFog');
+    this.dust=gl.getUniformLocation(program,'uDust');this.pointScale=gl.getUniformLocation(program,'uPointScale');
+    this.dynamicMesh=new Mesh(65536);this.weaponMesh=new Mesh();this.dustMesh=new Mesh(4096);
     const mesh=new Mesh();
     for(const b of world.geometry)mesh.box(b.x,b.y,b.z,b.w,b.h,b.d,b.color);
     for(const b of world.solids)if(b.h<5){
       mesh.box(b.x+0.65,0.022,b.z-0.45,b.w+0.8,0.012,b.d+0.8,[0.17,0.21,0.21]);
     }
-    this.staticBuffer=gl.createBuffer();this.dynamicBuffer=gl.createBuffer();this.staticCount=mesh.data.length/9;
-    gl.bindBuffer(gl.ARRAY_BUFFER,this.staticBuffer);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(mesh.data),gl.STATIC_DRAW);
+    this.staticBuffer=gl.createBuffer();this.staticCount=mesh.length/9;
+    gl.bindBuffer(gl.ARRAY_BUFFER,this.staticBuffer);gl.bufferData(gl.ARRAY_BUFFER,mesh.data.subarray(0,mesh.length),gl.STATIC_DRAW);
     gl.enable(gl.DEPTH_TEST);gl.disable(gl.CULL_FACE);
     this.width=0;this.height=0;this.lastVP=null;
   }
@@ -85,9 +100,11 @@ export class Renderer {
     const gl=this.gl;gl.bindBuffer(gl.ARRAY_BUFFER,buffer);
     this.attributes.forEach((a,i)=>{gl.enableVertexAttribArray(a);gl.vertexAttribPointer(a,3,gl.FLOAT,false,36,i*12);});
   }
-  drawMesh(mesh){
-    if(!mesh.data.length)return;
-    const gl=this.gl;this.bind(this.dynamicBuffer);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(mesh.data),gl.DYNAMIC_DRAW);gl.drawArrays(gl.TRIANGLES,0,mesh.data.length/9);
+  drawMesh(mesh,points=false){
+    if(!mesh.length)return;
+    const gl=this.gl;mesh.buffer??=gl.createBuffer();this.bind(mesh.buffer);
+    if(!mesh.gpuCapacity||mesh.gpuCapacity<mesh.data.byteLength){mesh.gpuCapacity=mesh.data.byteLength;gl.bufferData(gl.ARRAY_BUFFER,mesh.gpuCapacity,gl.DYNAMIC_DRAW);}
+    gl.bufferSubData(gl.ARRAY_BUFFER,0,mesh.data.subarray(0,mesh.length));gl.drawArrays(points?gl.POINTS:gl.TRIANGLES,0,mesh.length/9);
   }
   render(game,effects,{menu=false,time=0,quality=1,reduced=false}={}){
     this.resize(quality);const gl=this.gl,p=game.player,w=game.weapon;
@@ -102,15 +119,19 @@ export class Renderer {
     }
     gl.clearColor(0.54,0.64,0.64,1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
     const vp=multiply(perspective(fov*Math.PI/180,this.width/this.height),view(eye,yaw,pitch));this.lastVP=vp;
-    gl.uniformMatrix4fv(this.vp,false,vp);gl.uniform3fv(this.eye,eye);gl.uniform1f(this.fog,1);
+    gl.uniformMatrix4fv(this.vp,false,vp);gl.uniform3fv(this.eye,eye);gl.uniform1f(this.fog,1);gl.uniform1f(this.dust,0);
     this.bind(this.staticBuffer);gl.drawArrays(gl.TRIANGLES,0,this.staticCount);
-    const dynamic=new Mesh();
+    const dynamic=this.dynamicMesh.clear();
     for(const b of game.bots)if(b.alive)this.bot(dynamic,b,game.time);
-    for(const part of effects.particles){
-      dynamic.box(part.x,part.y,part.z,part.size,part.size,part.size,part.color,part.life*5);
-    }
     for(const t of effects.tracers)dynamic.line(t.origin,t.point,0.016,t.enemy?[1,0.35,0.16]:[1,0.91,0.62]);
     this.drawMesh(dynamic);
+    if(effects.particles.length){
+      const dust=this.dustMesh.clear();
+      for(const p of effects.particles)dust.vertex([p.x,p.y,p.z],[p.size,Math.min(1,p.life*2.5),0],p.color);
+      gl.uniform1f(this.dust,1);gl.uniform1f(this.pointScale,this.height/(2*Math.tan(fov*Math.PI/360)));
+      gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE);gl.depthMask(false);this.drawMesh(dust,true);
+      gl.depthMask(true);gl.disable(gl.BLEND);gl.uniform1f(this.dust,0);
+    }
     if(!menu&&w.ads<0.94){
       gl.clear(gl.DEPTH_BUFFER_BIT);gl.uniformMatrix4fv(this.vp,false,perspective(64*Math.PI/180,this.width/this.height));
       gl.uniform3fv(this.eye,[0,0,0]);gl.uniform1f(this.fog,0);
@@ -118,7 +139,7 @@ export class Renderer {
     }
   }
   bot(mesh,b,time){
-    const flash=b.flash>0,body=flash?[0.95,0.98,0.82]:[0.23,0.49,0.45],metal=[0.12,0.18,0.19],sand=[0.64,0.65,0.52];
+    const flash=b.flash>0,body=flash?[0.95,0.98,0.82]:b.role===1?[0.38,0.48,0.63]:b.role===2?[0.47,0.53,0.28]:[0.23,0.49,0.45],metal=[0.12,0.18,0.19],sand=[0.64,0.65,0.52];
     const sn=Math.sin(b.yaw),cs=Math.cos(b.yaw);
     const box=(x,y,z,w,h,d,c)=>mesh.box(b.x+x*cs+z*sn,b.y+y,b.z-x*sn+z*cs,w,h,d,c,b.yaw);
     mesh.box(b.x,0.035,b.z,1.05,0.025,0.8,[0.14,0.18,0.18]);
@@ -138,7 +159,7 @@ export class Renderer {
     }
   }
   weapon(game,reduced){
-    const mesh=new Mesh(),w=game.weapon;
+    const mesh=this.weaponMesh.clear(),w=game.weapon;
     const walk=game.moving&&!reduced?Math.sin(game.time*11)*0.014:0;
     const reload=w.reload>0?Math.sin((1-w.reload/1.85)*Math.PI):0;
     const x=mix(0.29,0,smooth(w.ads)),y=-0.26-walk-reload*0.35-w.ads*0.025,z=-0.55+w.recoil*0.1;
