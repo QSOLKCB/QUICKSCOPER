@@ -1,0 +1,63 @@
+name: Test and deploy QUICKSCOPER
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+# Queue at workflow entry (before tests). Older, slow checks cannot replace a
+# newer deployment that is already pending. PRs have independent groups.
+concurrency:
+  group: quickscoper-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+      - name: Check scripts and assets
+        run: node scripts/check.mjs
+      - name: Test gameplay and offline contracts
+        run: npm test
+      - name: Package static game
+        run: npm run build
+      - name: Install isolated browser test tooling
+        run: |
+          npm install --prefix "$RUNNER_TEMP/quickscoper-browser" --no-audit --no-fund playwright@1.62.1
+          "$RUNNER_TEMP/quickscoper-browser/node_modules/.bin/playwright" install --with-deps chromium
+      - name: Browser smoke test
+        run: NODE_PATH="$RUNNER_TEMP/quickscoper-browser/node_modules" node scripts/browser-check.cjs
+      - name: Save browser screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quickscoper-browser
+          path: artifacts/
+          if-no-files-found: ignore
+      - name: Upload tested Pages artifact
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: dist
+  deploy:
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    needs: check
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+      - name: Deploy tested build
+        id: deployment
+        uses: actions/deploy-pages@v4

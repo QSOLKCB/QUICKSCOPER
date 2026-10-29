@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#151e1c">
+  <meta name="description" content="Snap in. Take the shot. An original, offline-ready quickscoping game. Built with pure WebGL and Web Audio.">
+  <title>QUICKSCOPER — Take the shot.</title>
+  <link rel="icon" href="./icon.svg" type="image/svg+xml">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <canvas id="world" aria-label="The Switchyard, a three-dimensional quickscoping arena"></canvas>
+  <canvas id="overlay" aria-hidden="true"></canvas>
+  <div class="film" aria-hidden="true"></div>
+
+  <main id="menu" class="menu">
+    <header class="masthead"><a href="./" class="wordmark" aria-label="Quickscoper home"><span class="brand-symbol">⌖</span> QS / QUICKSCOPER</a><span class="edition">INDEPENDENT AIM LAB <i></i> VOL. 01</span></header>
+    <section class="hero" aria-labelledby="title">
+      <p class="eyebrow"><span class="signal"></span> SINGLE PLAYER · ZERO HESITATION</p>
+      <h1 id="title">QUICK<span>SCOPER<span class="period">.</span></span></h1>
+      <p class="tagline">Snap in. Take the shot.</p>
+      <p class="intro">One rifle. Five rounds. Make every moment count.<br>Find your rhythm in the Switchyard.</p>
+      <div class="mode-select" role="group" aria-label="Game mode">
+        <button id="mode-run" class="mode active" aria-pressed="true"><span class="mode-no">01</span><span><strong>THE CIRCUIT</strong><small>90 seconds · score attack</small></span><span class="mode-indicator">↗</span></button>
+        <button id="mode-practice" class="mode" aria-pressed="false"><span class="mode-no">02</span><span><strong>FREE RANGE</strong><small>No timer · no incoming fire</small></span><span class="mode-indicator">↗</span></button>
+      </div>
+      <div class="launch-row"><button id="start" class="primary">ENTER THE YARD <span>↗</span></button><button id="settings-open" class="icon-button" aria-label="Open settings">⚙</button></div>
+      <p id="menu-note" class="micro">DESKTOP + MOUSE REQUIRED <span>·</span> ESC TO PAUSE</p>
+      <p id="error" class="error" role="alert" hidden></p>
+    </section>
+    <aside class="location-card"><span class="cross-corner">+</span><span class="eyebrow">TRAINING GROUND / 001</span><h2>THE SWITCHYARD</h2><p>Open sightlines. Close calls.</p><div class="location-meta"><span>ORIGINAL ARENA</span><span>48 × 60 M</span></div></aside>
+    <footer class="menu-footer">
+      <div class="control-guide"><span><kbd>W A S D</kbd> MOVE</span><span><kbd>RMB</kbd> SCOPE</span><span><kbd>LMB</kbd> FIRE</span><span><kbd>R</kbd> RELOAD</span><button id="help-open" class="text-button">ALL CONTROLS ↗</button></div>
+      <div class="footer-meta"><span id="offline-status">OFFLINE COPY PENDING</span><span id="best-score">PERSONAL BEST —</span><span>QSOL–IMC / v0.1.0</span></div>
+    </footer>
+  </main>
+
+  <section id="hud" class="hud" aria-label="Game status" hidden>
+    <div class="hud-top"><div class="hud-brand">⌖ <b>QUICKSCOPER</b><small id="hud-mode">THE CIRCUIT</small></div><div class="timer"><span id="time">01:30</span><small id="timer-label">TIME REMAINING</small></div><div class="score"><small>SCORE</small><b id="score">000000</b><span id="combo">BUILD A STREAK</span></div></div>
+    <div id="announcement" class="announcement" aria-live="polite"></div>
+    <div id="kill-feed" class="kill-feed"></div>
+    <div class="hud-bottom"><div class="health"><small>VITALS <span id="health-value">100</span></small><div class="health-track"><i id="health-bar"></i></div><span id="status-text">WASD MOVE · SHIFT SPRINT · SPACE JUMP</span></div><div class="weapon-info"><small>QS–01 / BOLT ACTION</small><div><b id="ammo">05</b><span> / 05</span></div><span id="weapon-status">READY</span></div></div>
+    <div id="scope-tip" class="scope-tip"></div>
+  </section>
+
+  <section id="pause" class="modal-layer" aria-labelledby="pause-title" hidden>
+    <div class="panel pause-panel"><p class="eyebrow">TAKE A BREATH</p><h2 id="pause-title">ON HOLD.</h2><p>The clock stops with you.</p><button id="resume" class="primary">BACK TO THE YARD <span>↗</span></button><button id="pause-settings" class="secondary">SETTINGS</button><div class="split"><button id="restart" class="text-button">RESTART RUN</button><button id="quit" class="text-button">RETURN TO MENU</button></div><p id="lock-message" class="micro" role="status"></p></div>
+  </section>
+
+  <section id="results" class="modal-layer" aria-labelledby="results-title" hidden>
+    <div class="panel results-panel"><p class="eyebrow">CIRCUIT COMPLETE</p><h2 id="results-title">NICE SHOOTING.</h2><div class="result-score"><span id="final-score">0</span><small id="record-label">FINAL SCORE</small></div><div id="results-grid" class="results-grid"></div><p id="rank" class="rank"></p><button id="play-again" class="primary">RUN IT BACK <span>↗</span></button><button id="results-menu" class="text-button">RETURN TO MENU</button></div>
+  </section>
+
+  <dialog id="settings" class="panel settings-panel"><form method="dialog"><button class="close" aria-label="Close settings">×</button><p class="eyebrow">DIAL IT IN</p><h2>YOUR SETUP.</h2><label for="sensitivity">Mouse sensitivity <output id="sens-output">1.00</output></label><input id="sensitivity" type="range" min="0.3" max="2.5" step="0.05" value="1"><label for="volume">Sound volume <output id="volume-output">45%</output></label><input id="volume" type="range" min="0" max="1" step="0.05" value="0.45"><label class="checkbox"><input id="invert" type="checkbox"> Invert vertical look</label><label class="checkbox"><input id="reduced" type="checkbox"> Reduced motion & flashes</label><label class="checkbox"><input id="low-quality" type="checkbox"> Lower render resolution</label><p class="micro">Settings and personal best stay on this device.</p><button class="primary">ALL SET <span>✓</span></button></form></dialog>
+
+  <dialog id="help" class="panel help-panel"><form method="dialog"><button class="close" aria-label="Close controls">×</button><p class="eyebrow">THE FIELD MANUAL</p><h2>MAKE IT QUICK.</h2><p>Hold the right mouse button to scope, line up, then click left. Your rifle settles after <b>160 ms</b>. Land the shot before <b>550 ms</b> for a quickscope bonus.</p><div class="help-controls"><span>Move</span><kbd>W A S D / ARROWS</kbd><span>Look / Fire</span><kbd>MOUSE / LEFT CLICK</kbd><span>Hold scope</span><kbd>RIGHT CLICK</kbd><span>Sprint / Jump</span><kbd>SHIFT / SPACE</kbd><span>Crouch / Reload</span><kbd>C or CTRL / R</kbd><span>Mute / Pause</span><kbd>M / ESC or P</kbd></div><p>A torso or head hit drops a bot; legs take two hits. Chain eliminations within <b>3.1 seconds</b> for up to <b>5×</b> points. Watch for orange charge bars—get behind cover before the bots fire.</p><p class="micro">ELIMINATION +100 · HEADSHOT +50 · QUICKSCOPE +100<br>RESPAWN −200 · HEALTH REGENERATES AFTER 3.5 SECONDS</p><button class="primary">GOT IT <span>↗</span></button></form></dialog>
+  <noscript><div class="noscript">QUICKSCOPER needs JavaScript enabled to run the game.</div></noscript>
+  <script type="module" src="./src/app.js"></script>
+</body>
+</html>
