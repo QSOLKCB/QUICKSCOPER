@@ -22,6 +22,7 @@ const assert=require('node:assert/strict');
   try{
     browser=await chromium.launch({headless:true,args:['--use-angle=swiftshader','--enable-unsafe-swiftshader']});
     const context=await browser.newContext({viewport:{width:1440,height:900}});page=await context.newPage();
+    await page.addInitScript(()=>{window.__inputTrace=[];window.addEventListener('mousemove',e=>{if(window.__inputTrace.length<15)window.__inputTrace.push({dx:e.movementX,dy:e.movementY,locked:!!document.pointerLockElement});});});
     const errors=[],badResponses=[];page.on('pageerror',error=>errors.push(error.message));
     page.on('response',response=>{if(response.status()>=400)badResponses.push(response.url());});
     await page.goto(url);await page.waitForFunction(()=>!document.getElementById('start').disabled);
@@ -41,13 +42,15 @@ const assert=require('node:assert/strict');
     await page.locator('#mode-practice').click();await page.locator('#start').click();
     await page.waitForFunction(()=>document.pointerLockElement?.id==='world'&&document.getElementById('pause').hidden);
     await page.waitForFunction(()=>document.getElementById('pause').hidden);
+    await page.screenshot({path:'artifacts/quickscoper-entry.png'});
+    console.log('Entry input trace:',await page.evaluate(()=>window.__inputTrace));
     // Fire / cycle / reload using normal input, without mutating simulation state.
     await page.mouse.down();await page.mouse.up();await page.waitForFunction(()=>document.getElementById('ammo').textContent==='04');
     await page.mouse.down({button:'right'});await page.waitForFunction(()=>document.getElementById('scope-tip').textContent.includes('AIM'));
     await page.screenshot({path:'artifacts/quickscoper-scope.png'});await page.mouse.up({button:'right'});
     await page.keyboard.press('r');await page.waitForFunction(()=>document.getElementById('ammo').textContent==='05');
     await page.screenshot({path:'artifacts/quickscoper-game.png'});
-    console.log('Firing, scope and reload: PASS');
+    console.log('Firing, scope and reload: PASS');console.log('Input trace:',await page.evaluate(()=>window.__inputTrace));
     await page.keyboard.down('w');await page.waitForTimeout(250);await page.keyboard.up('w');
     await page.keyboard.press('p');await page.locator('#pause').waitFor({state:'visible'});
     const before=await page.locator('#time').textContent();await page.waitForTimeout(250);assert.equal(await page.locator('#time').textContent(),before);
