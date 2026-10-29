@@ -106,3 +106,14 @@ test('bot hitboxes rotate with the rendered torso and arms register as limb hits
  assert.notEqual(trace([0.35,1.6,0],[0,0,-1],[],[bot]).part,'body');
  bot.yaw=0;assert.equal(trace([0.49,1.17,0],[0,0,-1],[],[bot]).part,'limb');
 });
+test('bots turn their rendered forward axis toward the player in every quadrant',()=>{
+ const g=targetGame();const bot=g.bots[0];
+ for(const [x,z] of [[10,0],[-10,0],[0,10],[0,-10],[7,-4]]){
+  g.player.x=bot.x+x;g.player.z=bot.z+z;g.updateBot(bot,0);
+  near(-Math.sin(bot.yaw),x/Math.hypot(x,z));near(-Math.cos(bot.yaw),z/Math.hypot(x,z));
+ }
+});
+test('low cover blocks a bot muzzle even when its head can see over it',()=>{
+ const g=targetGame('run');g.player.invulnerable=0;g.bots[0].wait=0;g.world.solids=[boxAt(0,0.625,13,10,1.25,1)];
+ advance(g,3);assert.equal(g.player.health,100);assert.equal(g.drainEvents().some(e=>e.type==='enemyShot'),false);
+});

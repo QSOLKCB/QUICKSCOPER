@@ -144,9 +144,11 @@ export class Game {
     const tx=b.homeX+Math.sin(b.phase)*2.2,tz=b.homeZ+Math.cos(b.phase*0.6)*1.6;
     const dx=tx-b.x,dz=tz-b.z,len=Math.hypot(dx,dz)||1;
     moveBody(b,dx/len*Math.min(len,1.8*dt),dz/len*Math.min(len,1.8*dt),this.world.solids,0.4,2.2);
-    b.yaw=Math.atan2(this.player.x-b.x,-(this.player.z-b.z));
+    // Model local -Z rotates to [-sin(yaw), 0, -cos(yaw)].
+    b.yaw=Math.atan2(-(this.player.x-b.x),-(this.player.z-b.z));
     if(this.mode==='practice')return;
-    const eye=[b.x,1.8,b.z],p=this.player,target=[p.x,p.y+(p.crouch?0.9:1.3),p.z];
+    const cs=Math.cos(b.yaw),sn=Math.sin(b.yaw);
+    const eye=[b.x+0.49*cs-0.9*sn,1.16,b.z-0.49*sn-0.9*cs],p=this.player,target=[p.x,p.y+(p.crouch?0.9:1.3),p.z];
     const delta=target.map((v,i)=>v-eye[i]),dist=Math.hypot(...delta),dir=delta.map(v=>v/(dist||1));
     const visible=dist<33&&!this.world.solids.some(box=>rayBox(eye,dir,box,dist)!==null);
     if(!visible||p.invulnerable>0){b.charge=0;b.wait=Math.max(b.wait,0.5);return;}

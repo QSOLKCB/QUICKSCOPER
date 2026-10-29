@@ -7,7 +7,7 @@ function harness(){
  const handlers={},removed=[],scope='https://example.test/QUICKSCOPER/',prefix=`quickscoper:${scope}:`;
  let files=[];
  const cache={addAll:async list=>{files=list;},match:async request=>request.includes?.('index.html')?'offline-document':undefined};
- const caches={open:async()=>cache,keys:async()=>[prefix+'old',prefix+'v0.1.0-1','another-game-cache','quickscoper:https://example.test/other/:old'],delete:async key=>removed.push(key)};
+ const caches={open:async()=>cache,keys:async()=>[prefix+'old',prefix+'v0.1.0-2','another-game-cache','quickscoper:https://example.test/other/:old'],delete:async key=>removed.push(key)};
  vm.runInNewContext(source,{self:{registration:{scope},clients:{claim:async()=>{}},addEventListener:(n,fn)=>handlers[n]=fn},caches,URL,fetch:async request=>'network:'+request.url});
  return {handlers,removed,scope,prefix,files:()=>files};
 }
