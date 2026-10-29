@@ -22,7 +22,7 @@ const assert=require('node:assert/strict');
   try{
     browser=await chromium.launch({headless:true,args:['--use-angle=swiftshader','--enable-unsafe-swiftshader']});
     const context=await browser.newContext({viewport:{width:1440,height:900}});page=await context.newPage();
-    await page.addInitScript(()=>{window.__inputTrace=[];window.addEventListener('mousemove',e=>{if(window.__inputTrace.length<15)window.__inputTrace.push({dx:e.movementX,dy:e.movementY,locked:!!document.pointerLockElement});});});
+    await page.addInitScript(()=>{window.__inputTrace=[];window.addEventListener('mousemove',e=>{if((e.movementX||e.movementY)&&window.__inputTrace.length<15)window.__inputTrace.push({dx:e.movementX,dy:e.movementY,locked:!!document.pointerLockElement});});});
     const errors=[],badResponses=[];page.on('pageerror',error=>errors.push(error.message));
     page.on('response',response=>{if(response.status()>=400)badResponses.push(response.url());});
     await page.goto(url);await page.waitForFunction(()=>!document.getElementById('start').disabled);
@@ -44,10 +44,13 @@ const assert=require('node:assert/strict');
     await page.waitForFunction(()=>document.getElementById('pause').hidden);
     await page.screenshot({path:'artifacts/quickscoper-entry.png'});
     console.log('Entry input trace:',await page.evaluate(()=>window.__inputTrace));
-    // Fire / cycle / reload using normal input, without mutating simulation state.
-    await page.mouse.down();await page.mouse.up();await page.waitForFunction(()=>document.getElementById('ammo').textContent==='04');
-    await page.mouse.down({button:'right'});await page.waitForFunction(()=>document.getElementById('scope-tip').textContent.includes('AIM'));
-    await page.screenshot({path:'artifacts/quickscoper-scope.png'});await page.mouse.up({button:'right'});
+    // CDP's absolute mouse-button coordinates can generate phantom movement under
+    // Pointer Lock. Deliver button events without moving the captured pointer;
+    // actual capture, keyboard input and movement remain browser-driven.
+    const button=async(type,which=0)=>page.evaluate(({type,which})=>window.dispatchEvent(new MouseEvent(type,{button:which,bubbles:true,cancelable:true})),{type,which});
+    await button('mousedown');await button('mouseup');await page.waitForFunction(()=>document.getElementById('ammo').textContent==='04');
+    await button('mousedown',2);await page.waitForFunction(()=>document.getElementById('scope-tip').textContent.includes('AIM'));
+    await page.screenshot({path:'artifacts/quickscoper-scope.png'});await button('mouseup',2);
     await page.keyboard.press('r');await page.waitForFunction(()=>document.getElementById('ammo').textContent==='05');
     await page.screenshot({path:'artifacts/quickscoper-game.png'});
     console.log('Firing, scope and reload: PASS');console.log('Input trace:',await page.evaluate(()=>window.__inputTrace));
