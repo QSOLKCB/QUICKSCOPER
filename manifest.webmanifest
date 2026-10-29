@@ -1,0 +1,1 @@
+{"name":"QUICKSCOPER","short_name":"QUICKSCOPER","description":"An original offline quickscoping game.","start_url":"./","scope":"./","display":"standalone","background_color":"#182320","theme_color":"#182320","icons":[{"src":"./icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any"}]}
