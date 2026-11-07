@@ -2,6 +2,10 @@
 
 **Land the shot. Watch it hang.**
 
+QUICKSCOPER v0.3.0 brings ideas from its sibling QSOL projects to the Switchyard: slow-motion kill moments from [Bullet-Time](https://github.com/QSOLKCB/Bullet-Time), a skins locker, a directional damage arc, glowing tracers, [VANILLAJS](https://github.com/QSOLKCB/VANILLAJS) frame gating and an [OPT](https://github.com/QSOLKCB/OPT) performance budget. The quickscope rhythm hasn't changed: every timing window and score is the same as in v0.2.0.
+
+[Play QUICKSCOPER](https://qsolkcb.github.io/QUICKSCOPER/)
+
 ## Slow-motion kill moments
 
 - A **quickscope headshot** or a **collateral** drops the world to **30% speed** for 0.45 s, then eases back.
@@ -20,6 +24,12 @@
 - Tracers now render in an additive glow pass.
 - Paused and results screens no longer redraw every display refresh (VANILLAJS `FrameGate`).
 - A new performance budget test simulates a full 90-second Circuit (about 0.3 s locally) and checks the replay is deterministic.
+
+## Compatibility
+
+- The default skins (Switchyard and Training Bots) reproduce the v0.2.0 look exactly.
+- Saved settings and personal bests carry over.
+- The offline cache revision is now `v0.3.0-1`. If you still see v0.2.0, reload once while online, close every QUICKSCOPER tab, then reopen it.
 
 ## Verification
 
