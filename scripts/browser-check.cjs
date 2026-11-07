@@ -39,6 +39,16 @@ const assert=require('node:assert/strict');
     });
     assert.ok(rendered.colors>15,`Scene must render varied world pixels, got ${rendered.colors}`);assert.equal(rendered.error,0);
     console.log('Scene rendering and offline install: PASS');
+    // Skins locker: every swatch loads, choices persist and reach the renderer.
+    await page.locator('#skins-open').click();
+    assert.equal(await page.locator('#skins .skin').count(),10);
+    const brokenSwatches=await page.evaluate(()=>[...document.querySelectorAll('#skins img')].filter(i=>!i.complete||!i.naturalWidth).map(i=>i.src));
+    assert.deepEqual(brokenSwatches,[]);await page.screenshot({path:'artifacts/quickscoper-skins.png'});
+    await page.locator('#skins .skin[data-group="rifle"][data-skin="ember"]').click();await page.locator('#skins .skin[data-group="bots"][data-skin="hazard"]').click();
+    assert.deepEqual(await page.evaluate(()=>JSON.parse(localStorage.getItem('quickscoper.settings')).skins),{rifle:'ember',bots:'hazard'});
+    assert.equal(await page.locator('#skins .skin[data-skin="ember"]').getAttribute('aria-pressed'),'true');
+    await page.getByRole('button',{name:'LOOKING SHARP'}).click();
+    console.log('Skins locker: swatches, selection and persistence: PASS');
     await page.locator('#mode-practice').click();await page.locator('#start').click();
     await page.waitForFunction(()=>document.pointerLockElement?.id==='world'&&document.getElementById('pause').hidden);
     await page.waitForFunction(()=>document.getElementById('pause').hidden);
@@ -77,7 +87,7 @@ const assert=require('node:assert/strict');
     const controllerContext=await browser.newContext({viewport:{width:1440,height:900},serviceWorkers:'block'});
     page=await controllerContext.newPage();page.on('pageerror',error=>errors.push(error.message));
     const appSource=await readFile(resolve(root,'src/app.js'),'utf8');
-    await page.route('**/src/app.js',route=>route.fulfill({contentType:'text/javascript',body:appSource+'\nglobalThis.__qa={get game(){return game},get pad(){return pad},controller,effects,sound};'}));
+    await page.route('**/src/app.js',route=>route.fulfill({contentType:'text/javascript',body:appSource+'\nglobalThis.__qa={get game(){return game},get pad(){return pad},controller,effects,sound,frameGate};'}));
     await page.addInitScript(()=>{
       window.__pad={index:0,id:'Xbox standard smoke fixture',mapping:'standard',connected:true,axes:[0,0,0,0],buttons:Array.from({length:17},()=>({value:0,pressed:false}))};
       window.__padPolls=0;Object.defineProperty(navigator,'getGamepads',{value:()=>{window.__padPolls++;return window.__pad.connected?[window.__pad]:[];}});
@@ -98,8 +108,16 @@ const assert=require('node:assert/strict');
     await page.waitForFunction(()=>window.__qa.game.stats.collaterals===1);
     const collateral=await page.evaluate(()=>({stats:window.__qa.game.stats,particles:window.__qa.effects.particles.length,music:window.__qa.sound.musicActive,context:window.__qa.sound.context.state}));
     assert.equal(collateral.stats.kills,2);assert.equal(collateral.stats.hits,1);assert.equal(collateral.stats.quick,2);assert.ok(collateral.particles>=64);assert.equal(collateral.music,true);assert.equal(collateral.context,'running');
+    // The collateral opened a slow-motion moment: the world clock now lags real time.
+    assert.ok(await page.evaluate(()=>window.__qa.effects.rings.length>0),'slow motion should ripple the tracer');
+    await page.waitForFunction(()=>window.__qa.game.worldTime<window.__qa.game.time-0.1,null,{timeout:5000});
+    await page.screenshot({path:'artifacts/quickscoper-slowmo.png'});
     await padButton(9,1);await page.locator('#pause').waitFor({state:'visible'});
     assert.equal(await page.evaluate(()=>window.__qa.sound.musicVoices.size),0);
+    // Paused frames are static: the frame gate must skip redraws instead of re-rendering.
+    const gateBefore=await page.evaluate(()=>window.__qa.frameGate.stats());await page.waitForTimeout(400);
+    const gateAfter=await page.evaluate(()=>window.__qa.frameGate.stats());
+    assert.ok(gateAfter.skipped>gateBefore.skipped+5,'paused frames should be skipped');assert.ok(gateAfter.drawn-gateBefore.drawn<=1,'paused screen should not redraw');
     // Freeze the impact for visual inspection; hide only the pause panel.
     await page.evaluate(()=>document.getElementById('pause').hidden=true);
     await page.screenshot({path:'artifacts/quickscoper-collateral-dust.png'});
@@ -122,7 +140,7 @@ const assert=require('node:assert/strict');
     await page.locator('#quit').click();await release();await padButton(0,1);await page.waitForFunction(()=>document.getElementById('menu').hidden&&document.getElementById('pause').hidden);await release();
     assert.equal(await page.locator('#ammo').textContent(),'05');assert.equal(await page.locator('#score').textContent(),'000000');
     assert.deepEqual(errors,[]);
-    console.log('Xbox emulation: buffered collateral, data dust, music, one shot per trigger, analog movement/look, reload, neutral resume, disconnect pause, focus pause, menus and sliders: PASS');
+    console.log('Xbox emulation: buffered collateral, slow-motion moment, paused frame gating, data dust, music, one shot per trigger, analog movement/look, reload, neutral resume, disconnect pause, focus pause, menus and sliders: PASS');
     // Exercise the WebGL 1 fallback, including the point-sprite shader.
     const webgl1=await browser.newContext();const legacy=await webgl1.newPage();
     await legacy.addInitScript(()=>{const original=HTMLCanvasElement.prototype.getContext;HTMLCanvasElement.prototype.getContext=function(type,...rest){return type==='webgl2'?null:original.call(this,type,...rest);};});

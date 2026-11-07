@@ -13,3 +13,5 @@ Read the opening design brief in IMPLEMENTATION.md and the current README before
 - Keep all runtime paths relative for /QUICKSCOPER/ Pages hosting. Update sw.js REVISION when cached assets change. Only remove this game's scope-specific caches.
 - Run npm test, npm run check, and npm run build. The CI browser smoke test validates the packaged game under the repository subpath, including offline reload.
 - Deploy only the tested dist/ artifact. Keep Pages write and OIDC permissions restricted to the deployment job. Pin the runner OS; do not add scheduled workflows.
+- Slow motion bends only the world clock (bots, world effects). Never apply timeScale to aim, scope, bolt, reload, the fire buffer, combo windows or the Circuit timer.
+- Skins are cosmetic data in src/skins.js. After changing them run npm run skins (regenerates assets/skins/ and the sw.js SKIN_FILES list), then bump sw.js REVISION.

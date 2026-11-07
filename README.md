@@ -2,7 +2,7 @@
 
 **Snap in. Take the shot.** An original single-player quickscoping game, built directly on the web platform. No game engine. No frameworks. No runtime dependencies.
 
-[**Play QUICKSCOPER**](https://qsolkcb.github.io/QUICKSCOPER/) · **v0.2.0 — Chain Reaction** · [Release notes](RELEASE_NOTES.md)
+[**Play QUICKSCOPER**](https://qsolkcb.github.io/QUICKSCOPER/) · **v0.3.0 — Slow Burn** · [Release notes](RELEASE_NOTES.md)
 
 The game turns the design brief in [IMPLEMENTATION.md](IMPLEMENTATION.md) into a complete game. That document is preserved as the original concept and unfinished sketch; the playable implementation lives in `index.html`, `style.css`, and `src/`.
 
@@ -23,6 +23,9 @@ For Xbox, connect the controller and press a button so the browser can detect it
 - Precise head, torso, and limb hits; solid cover; normalized movement, sprinting, jumping, and crouching.
 - Collateral hits through aligned bots, multi-kill bonuses, digital dust explosions, tracers, hitmarkers and local records.
 - Original procedural music at 108 BPM: Euclidean rhythms and modular minor-pentatonic melodies. Streaks add layers; music has its own volume control.
+- **Slow-motion kill moments:** a quickscope headshot or a collateral briefly drops the world to 30% speed. Data dust hangs in the air, your tracer leaves air ripples, the mix sinks under a low-pass filter and the yard takes on a warm grade. Only the world clock slows: aim, scope settle, bolt, buffer and the Circuit timer stay real-time, so every timing window and score is unchanged. Toggle it in Settings.
+- **The locker (◈ on the menu, Skins in pause):** six QS–01 finishes (Switchyard, Ivory & Brass, Ember, Chrome Noir, Jade, Tiger Stripe) and four bot looks (Training Bots, Chrome Units, Night Shift, Hazard Crew). Cosmetic only; flankers keep a distinct cool tone in every look.
+- An on-screen arc points at whichever bot just hit you.
 - Xbox controller profile with analog movement, adjustable look speed/deadzone, slower scoped aim and controller-operated menus.
 - Bots close distance, strafe, find routes around cover and dodge after surviving a hit. Flankers move faster, with distinct blue armor.
 
@@ -78,7 +81,7 @@ Choose **Keyboard + mouse** or **Xbox controller** above the start button or in 
 
 Losing focus or changing tabs pauses the simulation. Mouse mode also pauses on pointer unlock; Xbox mode does not require mouse capture and pauses on controller disconnect. Resume is deliberate, and controller inputs must return to neutral to prevent held triggers carrying into the next screen. Click the page once to enable audio if the browser blocks controller-only activation.
 
-Settings include separate mouse/controller sensitivities, stick deadzone, inverted look, master volume, music volume, reduced motion/flashes and lower render resolution/particle count. Settings and the Circuit best score stay on your device.
+Settings include separate mouse/controller sensitivities, stick deadzone, inverted look, master volume, music volume, reduced motion/flashes, lower render resolution/particle count and slow-motion kill moments. Settings and the Circuit best score stay on your device.
 
 ## Sound and accessibility
 
@@ -90,7 +93,7 @@ Set **Math music** to **0%** for effects only, or adjust **Master volume** to co
 
 Visit the HTTPS Pages site once and wait for **OFFLINE READY** in the menu. The service worker caches every runtime file, so the same address can reopen without a network connection. Browser storage can be cleared or evicted; the status is confirmation of a completed cache, not a guarantee of permanent storage. Updates activate after all old game tabs close.
 
-**Still seeing an older version?** Reload once while online so the update can download, close every QUICKSCOPER tab, then reopen the game. The menu footer should show **v0.2.0**. Closing tabs preserves your saved settings and personal best.
+**Still seeing an older version?** Reload once while online so the update can download, close every QUICKSCOPER tab, then reopen the game. The menu footer should show **v0.3.0**. Closing tabs preserves your saved settings and personal best.
 
 There are no accounts, analytics, multiplayer services, remote assets, or external runtime requests. WebGL is required. Unsupported graphics show an explanation; audio, local storage, and offline caching are optional and fail gracefully.
 
@@ -111,7 +114,7 @@ npm run check
 npm run build
 ```
 
-`dist/` contains only the distributable game and license. `npm run benchmark` measures CPU mesh construction (not GPU FPS). `scripts/browser-check.cjs` uses Playwright as isolated CI tooling, not a game dependency. **v0.2.0 validation:** all 46 automated tests passed, along with the packaged Chromium browser checks. The workflow runs rendering/input tests, captures screenshots, and checks offline reload at `/QUICKSCOPER/` before deploying. It also emulates Xbox inputs through the real app, verifies collateral scoring/data-dust rendering and music lifecycle, and checks WebGL 1 fallback. Controller automation uses emulated standard Gamepad inputs; physical Xbox hardware was not available for testing. Real GPU performance and controller feel vary by device.
+`dist/` contains only the distributable game and license. `npm run benchmark` measures CPU mesh construction (not GPU FPS). `scripts/browser-check.cjs` uses Playwright as isolated CI tooling, not a game dependency. **v0.3.0 validation:** all 53 automated tests passed, along with the packaged Chromium browser checks. The workflow runs rendering/input tests, captures screenshots, and checks offline reload at `/QUICKSCOPER/` before deploying. It also emulates Xbox inputs through the real app, verifies collateral scoring/data-dust rendering and music lifecycle, and checks WebGL 1 fallback. v0.3.0 adds checks for the skins locker, the slow-motion clock after a real controller collateral, and paused-frame gating. Controller automation uses emulated standard Gamepad inputs; physical Xbox hardware was not available for testing. Real GPU performance and controller feel vary by device.
 
 ## GitHub Pages
 
@@ -129,9 +132,20 @@ Set **Settings → Pages → Build and deployment → Source → GitHub Actions*
 | `src/navigation.js` | Shared cached flow field for cover navigation |
 | `src/audio.js`, `src/music.js` | Local sound synthesis and mathematical music sequencing |
 | `src/app.js` | Input, lifecycle, Canvas overlay, HUD, settings and effects |
+| `src/skins.js` | Rifle finishes and bot looks (palettes and pattern decals) |
+| `src/frame-gate.js` | VANILLAJS frame gate: skips redrawing static paused/results frames |
+| `scripts/skins.mjs` | Generates `assets/skins/` swatches from `src/skins.js` (`npm run skins`) |
 | `sw.js` | Scope-isolated offline cache |
 
 See [engineering rules](AGENTS.md) and [design notes](docs/DESIGN.md).
+
+## Borrowed from sibling projects
+
+v0.3.0 brings in work from other QSOL repositories, all Apache-2.0:
+
+- [Bullet-Time](https://github.com/QSOLKCB/Bullet-Time): the world-clock time-scale idea, slow-motion grade, audio low-pass, air ripples, directional damage indicator and the data-driven skins system with generated swatches.
+- [VANILLAJS](https://github.com/QSOLKCB/VANILLAJS): `FrameGate` (`modules/frame-gate`), used unchanged so paused and results frames are not re-rendered every display refresh.
+- [OPT](https://github.com/QSOLKCB/OPT): OPT-BUDGET-001 (a regression budget for a whole simulated Circuit, about 0.3 s locally against a 4 s budget) and OPT-INV-001 (static frames reused rather than recomputed).
 
 ## Original work and license
 

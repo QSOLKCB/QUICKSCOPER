@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 60" role="img" aria-label="TIGER STRIPE rifle finish">
+<defs><filter id="g" x="-20%" y="-80%" width="140%" height="260%"><feGaussianBlur stdDeviation="1.2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs><rect width="100" height="60" rx="5" fill="#101b19"/>
+<rect x="2" y="30" width="14" height="2.4" fill="#1f1a17"/>
+<rect x="14" y="28" width="18" height="8" fill="#d1701a"/><rect x="30" y="26" width="38" height="10" fill="#1f1a17"/><rect x="66" y="28" width="30" height="12" fill="#d1701a"/>
+<path d="M58 36 L64 36 L61 48 L55 48 Z" fill="#d1701a"/><path d="M46 36 Q50 44 55 36" fill="none" stroke="#eb9933" stroke-width="1.6"/>
+<rect x="34" y="17" width="26" height="6" rx="3" fill="#1f1a17"/><rect x="58" y="16" width="5" height="8" rx="2" fill="#eb9933"/><rect x="62.5" y="17.5" width="1.2" height="5" fill="#734d1a"/>
+<rect x="40" y="23" width="3" height="3" fill="#eb9933"/><rect x="52" y="23" width="3" height="3" fill="#eb9933"/>
+<path d="M16.7 28 h3 l-3 8 h-3 z" fill="#0f0d0a"/><path d="M21.2 28 h3 l-3 8 h-3 z" fill="#0f0d0a"/><path d="M25.7 28 h3 l-3 8 h-3 z" fill="#0f0d0a"/><path d="M30.2 28 h3 l-3 8 h-3 z" fill="#0f0d0a"/><path d="M35.7 26 h3 l-3 10 h-3 z" fill="#0f0d0a"/><path d="M45.2 26 h3 l-3 10 h-3 z" fill="#0f0d0a"/><path d="M54.7 26 h3 l-3 10 h-3 z" fill="#0f0d0a"/><path d="M64.2 26 h3 l-3 10 h-3 z" fill="#0f0d0a"/><path d="M70.5 28 h3 l-3 12 h-3 z" fill="#0f0d0a"/><path d="M78.0 28 h3 l-3 12 h-3 z" fill="#0f0d0a"/><path d="M85.5 28 h3 l-3 12 h-3 z" fill="#0f0d0a"/><path d="M93.0 28 h3 l-3 12 h-3 z" fill="#0f0d0a"/>
+</svg>

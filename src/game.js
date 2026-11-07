@@ -1,7 +1,7 @@
 import {clamp, forward, seededRandom, boxAt, rayBox} from './math.js';
 import {makeWorld} from './world.js';
 import {Navigation} from './navigation.js';
-export const RULES = Object.freeze({duration:90, magazine:5, reload:1.85, bolt:0.82, adsIn:0.15, quickStart:0.15, quickEnd:0.55, fireBuffer:0.18, comboWindow:3.1, charge:1.15});
+export const RULES = Object.freeze({duration:90, magazine:5, reload:1.85, bolt:0.82, adsIn:0.15, quickStart:0.15, quickEnd:0.55, fireBuffer:0.18, comboWindow:3.1, charge:1.15, slowmoScale:0.3, slowmoTime:0.45, slowmoRecover:7});
 export function hitboxes(bot) {
   return [
     {part:'head',...boxAt(bot.x,bot.y+1.93,bot.z,0.52,0.5,0.52)},
@@ -48,8 +48,12 @@ export function moveBody(body,dx,dz,solids,r=0.3,height=1.7) {
   }
 }
 export class Game {
-  constructor(mode='run',seed=23) {
-    this.mode=mode;this.random=seededRandom(seed);this.world=makeWorld();
+  constructor(mode='run',seed=23,options={}) {
+    this.mode=mode;this.options={slowmo:options.slowmo!==false};
+    // Slow-motion kill moments bend only the WORLD clock (bots, their attacks and
+    // respawns). Aim, scope, bolt, movement and the Circuit timer stay real-time,
+    // so every quickscope and fire-buffer window is unchanged.
+    this.timeScale=1;this.slowmo=0;this.worldTime=0;this.random=seededRandom(seed);this.world=makeWorld();
     this.time=0;this.remaining=RULES.duration;this.finished=false;this.events=[];
     this.player={x:0,y:0,z:18,yaw:0,pitch:0,vy:0,grounded:true,crouch:false,health:100,invulnerable:2};
     this.weapon={ammo:RULES.magazine,bolt:0,reload:0,ads:0,adsTime:0,aiming:false,recoil:0,queued:0,queueAim:false};
@@ -97,7 +101,7 @@ export class Game {
     w.ammo--;w.bolt=RULES.bolt;w.recoil=1;w.aiming=false;w.adsTime=0;w.queued=0;
     this.stats.shots++;this.emit('shot',{hit,origin,quick});
     if(hit.hits.length)this.stats.hits++;
-    let kills=0;
+    let kills=0,headKill=false;
     for(const target of hit.hits) {
       const hit=target;
       this.stats.targetsHit++;hit.bot.hp-=hit.part==='head'?150:hit.part==='body'?100:60;hit.bot.flash=0.16;
@@ -107,7 +111,7 @@ export class Game {
       if(killed) {
         hit.bot.alive=false;hit.bot.respawn=1.3+this.random();kills++;
         this.combo=this.time-this.lastKill<=RULES.comboWindow?this.combo+1:1;this.lastKill=this.time;
-        const multiplier=Math.min(5,this.combo),head=hit.part==='head';
+        const multiplier=Math.min(5,this.combo),head=hit.part==='head';headKill||=head;
         const points=(100+(head?50:0)+(quick?100:0))*multiplier;
         this.stats.kills++;this.stats.score+=points;this.stats.quick+=Number(quick);this.stats.heads+=Number(head);
         this.stats.bestCombo=Math.max(this.stats.bestCombo,this.combo);
@@ -119,13 +123,17 @@ export class Game {
       this.stats.bestCollateral=Math.max(this.stats.bestCollateral,kills);
       this.emit('collateral',{kills,bonus,point:hit.point});
     }
+    if(this.options.slowmo&&(kills>=2||(quick&&headKill))){
+      this.slowmo=RULES.slowmoTime;this.timeScale=RULES.slowmoScale;
+      this.emit('slowmo',{reason:kills>=2?'collateral':'quickscope',point:hit.point});
+    }
     return hit;
   }
-  damage(amount) {
+  damage(amount,from=null) {
     if(this.mode==='practice'||this.player.invulnerable>0||this.finished) return;
-    const p=this.player;p.health=Math.max(0,p.health-amount);this.lastDamage=this.time;this.emit('damage');
+    const p=this.player;p.health=Math.max(0,p.health-amount);this.lastDamage=this.time;this.emit('damage',{from});
     if(p.health===0) {
-      this.stats.deaths++;this.stats.score=Math.max(0,this.stats.score-200);this.combo=0;
+      this.stats.deaths++;this.slowmo=0;this.stats.score=Math.max(0,this.stats.score-200);this.combo=0;
       Object.assign(p,{x:0,y:0,z:18,vy:0,grounded:true,yaw:0,pitch:0,health:100,invulnerable:2.5,crouch:false});
       Object.assign(this.weapon,{ammo:RULES.magazine,bolt:0,reload:0,aiming:false,ads:0,adsTime:0,queued:0});
       this.emit('respawn');
@@ -134,6 +142,10 @@ export class Game {
   step(dt,input={}) {
     if(this.finished||!Number.isFinite(dt)||dt<=0)return;
     dt=Math.min(dt,1/30);this.time+=dt;
+    this.slowmo=Math.max(0,this.slowmo-dt);
+    if(this.slowmo>0)this.timeScale=RULES.slowmoScale;
+    else this.timeScale=Math.min(1,this.timeScale+(1-this.timeScale)*Math.min(1,dt*RULES.slowmoRecover)+dt*0.05);
+    const worldDt=dt*this.timeScale;this.worldTime+=worldDt;
     if(this.mode==='run') {this.remaining=Math.max(0,RULES.duration-this.time);if(this.remaining<=0){this.finished=true;this.emit('end');return;}}
     const p=this.player,w=this.weapon;
     p.invulnerable=Math.max(0,p.invulnerable-dt);
@@ -169,7 +181,7 @@ export class Game {
       else if(w.bolt===0&&w.reload===0&&(!w.queueAim||(w.aiming&&w.adsTime+1e-8>=RULES.quickStart)))this.shoot();
       else w.queued=Math.max(0,w.queued-dt);
     }
-    for(const bot of this.bots) this.updateBot(bot,dt);
+    for(const bot of this.bots) this.updateBot(bot,worldDt);
   }
   botSight(b) {
     const p=this.player,cs=Math.cos(b.yaw),sn=Math.sin(b.yaw);
@@ -223,7 +235,7 @@ export class Game {
         const sight=this.botSight(b);
         if(sight.visible){
           this.emit('enemyShot',sight);
-          if(this.random()<(this.sprinting?0.25:this.moving?0.48:0.82))this.damage(18);
+          if(this.random()<(this.sprinting?0.25:this.moving?0.48:0.82))this.damage(18,[b.x,b.z]);
         }
         b.charge=0;b.wait=2.5+this.random()*2;
       }
