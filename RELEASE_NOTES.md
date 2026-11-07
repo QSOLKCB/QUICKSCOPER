@@ -1,3 +1,30 @@
+# v0.3.0 — Slow Burn
+
+**Land the shot. Watch it hang.**
+
+## Slow-motion kill moments
+
+- A **quickscope headshot** or a **collateral** drops the world to **30% speed** for 0.45 s, then eases back.
+- Only the world slows: bots, their charge bars and respawns, data dust and tracers. Your aim, the **150 ms** scope settle, the **820 ms** bolt, the **180 ms** fire buffer and the Circuit timer stay real-time. Scores and timing windows are identical with the effect on or off.
+- Warm colour grade, a shockwave ring, air ripples along your tracer and a low-pass sweep over the whole mix. Turn it off with **Settings → Slow-motion kill moments**.
+
+## The locker
+
+- Six QS–01 finishes: **Switchyard**, **Ivory & Brass** (engraved), **Ember** (glowing inlay), **Chrome Noir** (racing stripe), **Jade** (gilt bands) and **Tiger Stripe**.
+- Four bot looks: **Training Bots**, **Chrome Units**, **Night Shift** and **Hazard Crew**. Flankers keep a distinct cool tone in every look.
+- Open it from **◈** on the menu or **Skins** in the pause menu. Cosmetic only: hitboxes never change. Choices are saved on your device and cached for offline play.
+
+## Readability and performance
+
+- A **directional damage arc** points at the bot that hit you.
+- Tracers now render in an additive glow pass.
+- Paused and results screens no longer redraw every display refresh (VANILLAJS `FrameGate`).
+- A new performance budget test simulates a full 90-second Circuit (about 0.3 s locally) and checks the replay is deterministic.
+
+## Verification
+
+53 automated tests and the packaged Chromium browser checks pass: rendering, offline subpath reload, mouse and Xbox flows, skins locker, slow-motion clock after a controller collateral, paused-frame gating, WebGL 1 fallback and the unsupported-graphics message. Real GPU performance and controller feel vary by device.
+
 # v0.2.0 — Chain Reaction
 
 **Snap in. Line them up. Turn them into data dust.**

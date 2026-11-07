@@ -3,32 +3,38 @@ import {Renderer} from './renderer.js';
 import {Sound} from './audio.js';
 import {XboxInput} from './controller.js';
 import {clamp,smooth,seededRandom} from './math.js';
+import {RIFLE_SKINS,BOT_SKINS,normalizeSkins} from './skins.js';
+import {FrameGate} from './frame-gate.js';
 const $=id=>document.getElementById(id),canvas=$('world'),overlay=$('overlay'),ctx=overlay.getContext('2d');
 const sound=new Sound(),controller=new XboxInput(),fxRandom=seededRandom(783);
 document.addEventListener('pointerdown',()=>{if(sound.context?.state!=='running')sound.start();},{passive:true});
+window.addEventListener('resize',()=>frameGate.invalidate());
 const storage={get(key,fallback){try{return JSON.parse(localStorage.getItem(key))??fallback;}catch{return fallback;}},set(key,value){try{localStorage.setItem(key,JSON.stringify(value));}catch{/* Private/quota-limited storage must not stop the game. */}}};
 const stored=storage.get('quickscoper.settings',{});
-const prefs={sensitivity:1,volume:0.45,musicVolume:0.3,padSensitivity:1,deadzone:0.16,profile:'mouse',invert:false,reduced:matchMedia('(prefers-reduced-motion: reduce)').matches,lowQuality:false};
+const prefs={sensitivity:1,volume:0.45,musicVolume:0.3,padSensitivity:1,deadzone:0.16,profile:'mouse',invert:false,reduced:matchMedia('(prefers-reduced-motion: reduce)').matches,lowQuality:false,slowmo:true,skins:normalizeSkins()};
 if(stored&&typeof stored==='object'){
   for(const key of ['sensitivity','volume'])if(typeof stored[key]==='number'&&Number.isFinite(stored[key]))prefs[key]=clamp(stored[key],key==='volume'?0:0.3,key==='volume'?1:2.5);
   for(const [key,min,max] of [['musicVolume',0,1],['padSensitivity',0.3,2.5],['deadzone',0.05,0.35]])if(Number.isFinite(stored[key]))prefs[key]=clamp(stored[key],min,max);
   if(['mouse','xbox'].includes(stored.profile))prefs.profile=stored.profile;
-  for(const key of ['invert','reduced','lowQuality'])if(typeof stored[key]==='boolean')prefs[key]=stored[key];
+  for(const key of ['invert','reduced','lowQuality','slowmo'])if(typeof stored[key]==='boolean')prefs[key]=stored[key];
+  prefs.skins=normalizeSkins(stored.skins);
 }
 let best=storage.get('quickscoper.best',0);if(!Number.isFinite(best)||best<0)best=0;
 let selectedMode='run',game=new Game('practice'),renderer=null,graphicsLost=false,state='menu',keys=new Set(),aim=false;
 let pad={},padJump=false,lastPadAim=false,last=0,accumulator=0,hudElapsed=0,controllerStatus='',announcementUntil=0,hitTime=0,hitHead=false,hitKilled=false,damageTime=0,feed=[];
-const effects={particles:[],tracers:[],labels:[]},particlePool=[];
+const effects={particles:[],tracers:[],labels:[],rings:[],indicators:[],slowWave:0},particlePool=[];
+// Paused and results frames are static: VANILLAJS FrameGate skips redundant redraws.
+const frameGate=new FrameGate();let contextEpoch=0;
 function showError(message){$('error').hidden=false;$('error').textContent=message;}
 function clearInput(){keys.clear();aim=false;pad={connected:pad.connected};padJump=false;lastPadAim=false;controller.reset();game.cancelShot();game.weapon.aiming=false;game.weapon.adsTime=0;}
-function resetEffects(){particlePool.push(...effects.particles);effects.particles.length=0;effects.tracers.length=0;effects.labels.length=0;feed=[];hitTime=0;damageTime=0;announcementUntil=0;$('announcement').replaceChildren();$('kill-feed').replaceChildren();}
+function resetEffects(){particlePool.push(...effects.particles);effects.particles.length=0;effects.tracers.length=0;effects.labels.length=0;effects.rings.length=0;effects.indicators.length=0;effects.slowWave=0;feed=[];hitTime=0;damageTime=0;announcementUntil=0;$('announcement').replaceChildren();$('kill-feed').replaceChildren();}
 function updateBest(){$('best-score').textContent=`PERSONAL BEST ${best?best.toLocaleString():'—'}`;}
 function chooseMode(mode){selectedMode=mode;for(const name of ['run','practice']){const b=$(`mode-${name}`);b.classList.toggle('active',mode===name);b.setAttribute('aria-pressed',String(mode===name));}}
 $('mode-run').onclick=()=>chooseMode('run');$('mode-practice').onclick=()=>chooseMode('practice');
 function syncPrefs(){
   $('sensitivity').value=prefs.sensitivity;$('sens-output').value=prefs.sensitivity.toFixed(2);
   $('volume').value=prefs.volume;$('volume-output').value=`${Math.round(prefs.volume*100)}%`;
-  $('invert').checked=prefs.invert;$('reduced').checked=prefs.reduced;$('low-quality').checked=prefs.lowQuality;
+  $('invert').checked=prefs.invert;$('reduced').checked=prefs.reduced;$('low-quality').checked=prefs.lowQuality;$('slowmo').checked=prefs.slowmo;
   $('music-volume').value=prefs.musicVolume;$('music-output').value=`${Math.round(prefs.musicVolume*100)}%`;
   $('pad-sensitivity').value=prefs.padSensitivity;$('pad-output').value=prefs.padSensitivity.toFixed(2);
   $('deadzone').value=prefs.deadzone;$('deadzone-output').value=`${Math.round(prefs.deadzone*100)}%`;
@@ -37,16 +43,34 @@ function syncPrefs(){
   $('menu-note').textContent=xbox?'XBOX · A TO START · CLICK ONCE FOR AUDIO':'KEYBOARD + MOUSE · ESC TO PAUSE';
   $('guide-move').textContent=xbox?'LS':'W A S D';$('guide-aim').textContent=xbox?'LT':'RMB';$('guide-fire').textContent=xbox?'RT':'LMB';$('guide-reload').textContent=xbox?'X':'R';
   sound.setVolume(prefs.volume);sound.setMusicVolume(prefs.musicVolume);storage.set('quickscoper.settings',prefs);
+  game.options.slowmo=prefs.slowmo;renderer?.setSkins(prefs.skins);syncSkinButtons();frameGate.invalidate();
 }
-for(const [id,key] of [['sensitivity','sensitivity'],['volume','volume'],['music-volume','musicVolume'],['pad-sensitivity','padSensitivity'],['deadzone','deadzone'],['invert','invert'],['reduced','reduced'],['low-quality','lowQuality']]){
+for(const [id,key] of [['sensitivity','sensitivity'],['volume','volume'],['music-volume','musicVolume'],['pad-sensitivity','padSensitivity'],['deadzone','deadzone'],['invert','invert'],['reduced','reduced'],['low-quality','lowQuality'],['slowmo','slowmo']]){
   $(id).addEventListener('input',()=>{prefs[key]=$(id).type==='checkbox'?$(id).checked:Number($(id).value);syncPrefs();});
 }
 for(const id of ['profile','control-profile'])$(id).addEventListener('change',()=>{prefs.profile=$(id).value;clearInput();syncPrefs();});
 function openSettings(){sound.start();$('settings').showModal();}
 $('settings-open').onclick=openSettings;$('pause-settings').onclick=openSettings;
 $('help-open').onclick=()=>$('help').showModal();
+// Skins wardrobe (adapted from Bullet-Time). Cosmetic only.
+function buildSkins(){
+  for(const group of [{key:'rifle',title:'QS–01 FINISH',skins:RIFLE_SKINS,prefix:'rifle'},{key:'bots',title:'TRAINING BOTS',skins:BOT_SKINS,prefix:'bots'}]){
+    const section=document.createElement('section'),heading=document.createElement('h3'),row=document.createElement('div');
+    section.className='skin-group';heading.textContent=group.title;row.className='skin-row';row.setAttribute('role','group');row.setAttribute('aria-label',group.title);
+    for(const [id,skin] of Object.entries(group.skins)){
+      const button=document.createElement('button'),img=document.createElement('img'),name=document.createElement('b'),note=document.createElement('small');
+      button.type='button';button.className='skin';button.dataset.group=group.key;button.dataset.skin=id;
+      img.src=`./assets/skins/${group.prefix}-${id}.svg`;img.alt='';img.width=100;img.height=60;name.textContent=skin.name;note.textContent=skin.note;
+      button.append(img,name,note);button.onclick=()=>{prefs.skins=normalizeSkins({...prefs.skins,[group.key]:id});syncPrefs();};row.append(button);
+    }
+    section.append(heading,row);$('skin-groups').append(section);
+  }
+}
+function syncSkinButtons(){for(const b of document.querySelectorAll('.skin'))b.setAttribute('aria-pressed',String(prefs.skins[b.dataset.group]===b.dataset.skin));}
+function openSkins(){sound.start();$('skins').showModal();}
+$('skins-open').onclick=openSkins;$('pause-skins').onclick=openSkins;buildSkins();
 function setScreen(next){
-  state=next;if(next!=='playing')sound.stopMusic();$('menu').hidden=next!=='menu';$('pause').hidden=next!=='paused';$('results').hidden=next!=='results';$('hud').hidden=next==='menu'||next==='results';
+  state=next;frameGate.invalidate();if(next!=='playing')sound.stopMusic();$('menu').hidden=next!=='menu';$('pause').hidden=next!=='paused';$('results').hidden=next!=='results';$('hud').hidden=next==='menu'||next==='results';
 }
 function requestLock(){
   if(!renderer)return;
@@ -63,7 +87,7 @@ function requestLock(){
 }
 function startRun(){
   if(!renderer)return;
-  game=new Game(selectedMode,Date.now()>>>0);clearInput();resetEffects();accumulator=0;
+  game=new Game(selectedMode,Date.now()>>>0,{slowmo:prefs.slowmo});clearInput();resetEffects();accumulator=0;
   $('hud-mode').textContent=selectedMode==='run'?'THE CIRCUIT / 90 SEC':'FREE RANGE / PRACTICE';
   $('timer-label').textContent=selectedMode==='run'?'TIME REMAINING':'NO TIME LIMIT';
   setScreen('paused');requestLock();sound.play('start');announce(selectedMode==='run'?'MAKE IT COUNT.':'FIND YOUR RHYTHM.',selectedMode==='run'?'90 seconds. Stack those quickscopes.':'No timer. No incoming fire.',2.3);updateHUD();
@@ -177,7 +201,14 @@ function consumeEvents(){
       announce(`${event.kills} IN ONE / COLLATERAL`,`+${event.bonus} PENETRATION BONUS`,1.6);
       feed.unshift({text:`COLLATERAL ×${event.kills}  +${event.bonus}`,until:game.time+4});feed=feed.slice(0,3);renderFeed();
     }
-    if(event.type==='damage')damageTime=0.35;
+    if(event.type==='damage'){damageTime=0.35;if(event.from)effects.indicators.push({x:event.from[0],z:event.from[1],life:1.2});}
+    if(event.type==='slowmo'){
+      effects.slowWave=1;const t=effects.tracers.findLast(t=>!t.enemy);
+      if(t&&!prefs.reduced){
+        const d=t.point.map((v,i)=>v-t.origin[i]),length=Math.hypot(...d),dir=d.map(v=>v/(length||1));
+        for(let at=2.5;at<length&&effects.rings.length<40;at+=2.2)effects.rings.push({pos:t.origin.map((v,i)=>v+dir[i]*at),dir,radius:0.03,life:0.55,max:0.55});
+      }
+    }
     if(event.type==='respawn'){clearInput();announce('BACK ON YOUR FEET.','−200 points · brief spawn protection',1.8);}
     if(event.type==='end')finish();
   }
@@ -193,10 +224,15 @@ function particles(point,count,color,body=false){
 }
 function compact(array,update,onExpire){let write=0;for(let read=0;read<array.length;read++){const value=array[read];update(value);if(value.life>0)array[write++]=value;else onExpire?.(value);}array.length=write;}
 function renderFeed(){const node=$('kill-feed');node.replaceChildren();for(const f of feed){const row=document.createElement('div');row.textContent=f.text;node.append(row);}}
-function updateEffects(dt){
-  const drag=Math.exp(-2*dt);
+const slowAmount=()=>clamp((1-game.timeScale)/(1-RULES.slowmoScale),0,1);
+function updateEffects(realDt){
+  // World effects follow the world clock: dust and tracers hang during slow motion.
+  let dt=realDt*game.timeScale;const drag=Math.exp(-2*dt);
   compact(effects.particles,p=>{p.life-=dt;p.vy-=(p.dust?0.8:12)*dt;p.x+=p.vx*dt;p.y+=p.vy*dt;p.z+=p.vz*dt;p.vx*=drag;p.vz*=drag;if(p.y<0.03){p.y=0.03;p.vy=Math.abs(p.vy)*0.2;}},p=>particlePool.push(p));
   compact(effects.tracers,t=>{t.life-=dt;});
+  compact(effects.rings,r=>{r.life-=dt;r.radius+=dt*0.4;});
+  compact(effects.indicators,i=>{i.life-=realDt;});effects.slowWave=Math.max(0,effects.slowWave-realDt*2.2);
+  dt=realDt;
   compact(effects.labels,l=>{l.life-=dt;l.point[1]+=dt*0.45;});
   hitTime=Math.max(0,hitTime-dt);damageTime=Math.max(0,damageTime-dt);
   if(announcementUntil>0&&game.time>announcementUntil){$('announcement').replaceChildren();announcementUntil=0;}
@@ -227,7 +263,17 @@ function drawOverlay(){
   if(overlay.width!==Math.round(width*dpr)||overlay.height!==Math.round(height*dpr)){overlay.width=Math.round(width*dpr);overlay.height=Math.round(height*dpr);}
   ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,width,height);
   if(state==='menu'||state==='results')return;
-  const x=width/2,y=height/2,w=game.weapon,ads=smooth(w.ads);
+  const x=width/2,y=height/2,w=game.weapon,ads=smooth(w.ads),slow=slowAmount();
+  if(slow>0.02){
+    const g=ctx.createRadialGradient(x,y,Math.min(width,height)*0.25,x,y,Math.hypot(x,y));
+    g.addColorStop(0,'rgba(40,24,6,0)');g.addColorStop(1,`rgba(36,18,4,${0.5*slow})`);ctx.fillStyle=g;ctx.fillRect(0,0,width,height);
+  }
+  if(effects.slowWave>0&&!prefs.reduced){ctx.strokeStyle=`rgba(255,214,140,${effects.slowWave*0.5})`;ctx.lineWidth=2+effects.slowWave*8;ctx.beginPath();ctx.arc(x,y,(1-effects.slowWave)*Math.hypot(x,y),0,Math.PI*2);ctx.stroke();}
+  // Directional damage: an arc pointing at the bot that hit you.
+  for(const i of effects.indicators){
+    const p=game.player,angle=Math.atan2(i.x-p.x,-(i.z-p.z))-p.yaw-Math.PI/2;
+    ctx.strokeStyle=`rgba(255,120,70,${Math.min(1,i.life)*0.85})`;ctx.lineWidth=5;ctx.beginPath();ctx.arc(x,y,92,angle-0.28,angle+0.28);ctx.stroke();
+  }
   if(ads>0.15){
     const radius=Math.min(width,height)*0.43;
     ctx.save();ctx.globalAlpha=clamp((ads-0.15)/0.55,0,1);ctx.fillStyle='#050a08';ctx.beginPath();ctx.rect(0,0,width,height);ctx.arc(x,y,radius,0,Math.PI*2,true);ctx.fill('evenodd');
@@ -264,13 +310,20 @@ function frame(now){
       game.step(1/120,input());updateEffects(1/120);consumeEvents();accumulator-=1/120;if(state!=='playing'){accumulator=0;break;}}
     hudElapsed+=delta;if(hudElapsed>=0.05){updateHUD();hudElapsed=0;}
   }
-  sound.music(state==='playing',Math.min(5,game.combo));
-  if(renderer&&!graphicsLost){renderer.render(game,effects,{menu:state==='menu',time:now/1000,quality:prefs.lowQuality?0:1,reduced:prefs.reduced});drawOverlay();}
+  sound.music(state==='playing',Math.min(5,game.combo));sound.setSlow(state==='playing'?slowAmount():0);
+  if(renderer&&!graphicsLost){
+    const draw=()=>{renderer.render(game,effects,{menu:state==='menu',time:now/1000,quality:prefs.lowQuality?0:1,reduced:prefs.reduced,slow:slowAmount()});drawOverlay();};
+    if(state==='paused'||state==='results'){
+      // Nothing moves on these screens; redraw only when the screen, size or settings change.
+      const width=Math.max(1,Math.round(canvas.clientWidth*(devicePixelRatio||1))),height=Math.max(1,Math.round(canvas.clientHeight*(devicePixelRatio||1)));
+      frameGate.present({key:state,width,height,contextEpoch},draw);
+    }else{frameGate.invalidate();draw();}
+  }
   requestAnimationFrame(frame);
 }
 canvas.addEventListener('webglcontextlost',e=>{e.preventDefault();graphicsLost=true;pauseGame();$('lock-message').textContent='Graphics context lost. Reload this page to restore the renderer.';$('resume').disabled=true;});
 canvas.addEventListener('webglcontextrestored',()=>{
-  try{renderer=new Renderer(canvas,game.world);graphicsLost=false;$('resume').disabled=false;$('lock-message').textContent='Graphics restored. Resume when ready.';}catch(error){$('lock-message').textContent=error.message;}
+  try{renderer=new Renderer(canvas,game.world);renderer.setSkins(prefs.skins);contextEpoch++;frameGate.invalidate();graphicsLost=false;$('resume').disabled=false;$('lock-message').textContent='Graphics restored. Resume when ready.';}catch(error){$('lock-message').textContent=error.message;}
 });
 async function offline(){
   if(!('serviceWorker' in navigator)||!isSecureContext){$('offline-status').textContent='LOCAL SERVER / ONLINE PLAY';return;}
@@ -285,6 +338,6 @@ async function offline(){
   }catch{$('offline-status').textContent='ONLINE PLAY / OFFLINE CACHE UNAVAILABLE';}
 }
 syncPrefs();updateBest();
-try{renderer=new Renderer(canvas,game.world);requestAnimationFrame(frame);}catch(error){showError(error.message);$('start').disabled=true;}
+try{renderer=new Renderer(canvas,game.world);renderer.setSkins(prefs.skins);requestAnimationFrame(frame);}catch(error){showError(error.message);$('start').disabled=true;}
 $('start').focus();
 offline();

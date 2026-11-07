@@ -1,4 +1,4 @@
-# QUICKSCOPER v0.2.0 implementation notes
+# QUICKSCOPER v0.3.0 implementation notes
 
 The opening brief asks for the feel of fast scope-and-shoot gameplay in a small, offline, single-player game using native browser technologies. The initial sketch had no executable HTML file and contained invalid shader assignment, incomplete camera matrices, mismatched buffer sizes, and unbounded timing. The implementation replaces those stubs with a coherent game while preserving the brief verbatim.
 
@@ -23,3 +23,11 @@ A local Node CPU microbenchmark on 2026-10-29 built 128 identical rotated boxes 
 Input mapping references: [W3C Gamepad](https://www.w3.org/TR/gamepad/). Audio timing references: [Web Audio](https://www.w3.org/TR/webaudio/). Browser testing uses an injected controller fixture and test-only module instrumentation, without shipping debug globals. This checks mapping and lifecycle, not Bluetooth/USB hardware.
 
 Next tuning should be based on play: scope timing, hip spread, bot placement, encounter density, and scoring. Keep the scope-to-shot rhythm central; avoid engine/framework migration or unnecessary service integrations.
+
+## v0.3.0 additions
+
+Slow-motion kill moments add a world clock to the simulation. `step(dt)` still receives real time; when a quickscope headshot or collateral sets `slowmo`, `timeScale` snaps to 0.3 and recovers smoothly once the 0.45 s moment ends. Bots (movement, perception, charge, respawn) receive `dt * timeScale`. Player movement, ADS, bolt, reload, the fire buffer, combo windows and the Circuit timer keep using real `dt`, so slow motion can never alter a quickscope window or a score. A test compares a full run with the effect on and off. Presentation follows the same split: particles, tracers and ripples use the world clock; HUD timers, labels and damage arcs use real time. The idea and grading come from QSOLKCB/Bullet-Time.
+
+Skins are data (`src/skins.js`): rifle palettes with pattern decals drawn as extra boxes on rifle panels, and bot palettes per role plus optional detail geometry. RGB sums above 2.6 are emissive in the shader, which is how the glowing inlays and optics work. `scripts/skins.mjs` renders the menu swatches from the same data and rewrites the `SKIN_FILES` list in `sw.js`; `npm run check` fails if the cache list or swatches go missing.
+
+`src/frame-gate.js` is VANILLAJS's `FrameGate`, unchanged. Paused and results frames are presented through it with the screen state, pixel size and context epoch as the key. Every playing or menu frame, screen change, resize, settings change and context restoration invalidates it. With the default `preserveDrawingBuffer:false`, a skipped frame keeps the last composited image on screen.

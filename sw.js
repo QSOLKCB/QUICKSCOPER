@@ -1,11 +1,12 @@
 // Increment this revision whenever any cached runtime file changes.
-const REVISION='v0.2.0-2';
+const REVISION='v0.3.0-1';
 // Scope-specific prefix prevents interference with other games on the same Pages origin.
 const PREFIX=`quickscoper:${self.registration.scope}:`;
 const CACHE=PREFIX+REVISION;
-const FILES=['./','./index.html','./style.css','./icon.svg','./manifest.webmanifest','./src/app.js','./src/math.js','./src/world.js','./src/game.js','./src/renderer.js','./src/audio.js','./src/controller.js','./src/music.js','./src/navigation.js'];
+const FILES=['./','./index.html','./style.css','./icon.svg','./manifest.webmanifest','./src/app.js','./src/math.js','./src/world.js','./src/game.js','./src/renderer.js','./src/audio.js','./src/controller.js','./src/music.js','./src/navigation.js','./src/skins.js','./src/frame-gate.js'];
+const SKIN_FILES=['./assets/skins/rifle-yard.svg','./assets/skins/rifle-ivory.svg','./assets/skins/rifle-ember.svg','./assets/skins/rifle-chrome.svg','./assets/skins/rifle-jade.svg','./assets/skins/rifle-tiger.svg','./assets/skins/bots-training.svg','./assets/skins/bots-chrome.svg','./assets/skins/bots-nightshift.svg','./assets/skins/bots-hazard.svg'];
 self.addEventListener('install',event=>{
-  event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(FILES)));
+  event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(FILES.concat(SKIN_FILES))));
   // Let an existing game finish. Updates activate after all old game tabs close.
 });
 self.addEventListener('activate',event=>{

@@ -12,4 +12,8 @@ for(const path of sources){
 const html=await readFile('index.html','utf8');
 for(const [,ref] of html.matchAll(/(?:src|href)="(\.\/[^"#]+)"/g))await stat(ref);
 JSON.parse(await readFile('manifest.webmanifest','utf8'));
+const sw=await readFile('sw.js','utf8');
+for(const file of (await readdir('src')).filter(f=>f.endsWith('.js')))if(!sw.includes(`./src/${file}`))throw new Error(`sw.js does not cache src/${file}`);
+const skins=[...sw.matchAll(/'(\.\/assets\/skins\/[^']+)'/g)].map(m=>m[1]);if(!skins.length)throw new Error('sw.js caches no skin swatches; run npm run skins');
+for(const ref of skins)await stat(ref);
 console.log(`Syntax and local asset checks passed. ${sources.length} runtime scripts, ${bytes.toLocaleString()} JS bytes.`);

@@ -1,7 +1,7 @@
 import {MUSIC_STEP,musicStep,noteHz} from './music.js';
 // All sounds are synthesized locally. No samples, tracks, or network requests.
 export class Sound {
-  constructor(){this.context=null;this.volume=0.45;this.musicVolume=0.3;this.muted=false;this.musicActive=false;this.musicVoices=new Set();this.musicIndex=0;this.nextNote=0;}
+  constructor(){this.context=null;this.volume=0.45;this.musicVolume=0.3;this.muted=false;this.musicActive=false;this.musicVoices=new Set();this.musicIndex=0;this.nextNote=0;this.slow=0;}
   start(){
     try{
       if(!this.context){
@@ -10,7 +10,9 @@ export class Sound {
         this.compressor=this.context.createDynamicsCompressor();
         this.compressor.threshold.value=-8;this.compressor.knee.value=12;this.compressor.ratio.value=8;
         this.compressor.attack.value=0.003;this.compressor.release.value=0.15;
-        this.master.connect(this.compressor);this.compressor.connect(this.context.destination);
+        // Slow-motion moments close this low-pass over the whole mix (from Bullet-Time).
+        this.filter=this.context.createBiquadFilter();this.filter.type='lowpass';this.filter.frequency.value=18000;
+        this.master.connect(this.filter);this.filter.connect(this.compressor);this.compressor.connect(this.context.destination);
         this.musicGain=this.context.createGain();this.musicGain.gain.value=this.musicVolume;this.musicGain.connect(this.master);
         const n=this.context.sampleRate*0.4;this.noise=this.context.createBuffer(1,n,this.context.sampleRate);
         const a=this.noise.getChannelData(0);for(let i=0;i<n;i++)a[i]=Math.random()*2-1;
@@ -38,10 +40,15 @@ export class Sound {
       this.nextNote+=MUSIC_STEP;this.musicIndex++;
     }
   }
+  // 0 = normal time, 1 = full slow motion. Lowers new effect pitch and muffles the mix.
+  setSlow(amount){
+    amount=Math.max(0,Math.min(1,amount));if(Math.abs(amount-this.slow)<0.01)return;this.slow=amount;
+    if(this.filter&&this.context)this.filter.frequency.setTargetAtTime(18000-17000*amount**0.7,this.context.currentTime,0.03);
+  }
   toggle(){this.muted=!this.muted;if(this.master)this.master.gain.value=this.muted?0:this.volume;return this.muted;}
   tone(frequency,duration,type='sine',volume=0.1,delay=0,end=frequency,music=false){
     const c=this.context;if(!c||c.state!=='running'||this.muted)return;
-    const t=c.currentTime+delay,o=c.createOscillator(),g=c.createGain();
+    const t=c.currentTime+delay,o=c.createOscillator(),g=c.createGain(),rate=music?1:1-this.slow*0.4;frequency*=rate;end*=rate;
     o.type=type;o.frequency.setValueAtTime(frequency,t);o.frequency.exponentialRampToValueAtTime(Math.max(10,end),t+duration);
     g.gain.setValueAtTime(0.001,t);g.gain.linearRampToValueAtTime(volume,t+0.003);g.gain.exponentialRampToValueAtTime(0.001,t+duration);
     o.connect(g);g.connect(music?this.musicGain:this.master);o.start(t);o.stop(t+duration+0.01);
@@ -66,6 +73,7 @@ export class Sound {
     if(type==='damage'){this.burst(0.14,0.2,600);this.tone(80,0.15,'triangle',0.2,0,30);}
     if(type==='enemyShot'){this.burst(0.06,0.07,1600);}
     if(type==='start'){[330,440,660].forEach((f,i)=>this.tone(f,0.12,'triangle',0.1,i*0.1));}
+    if(type==='slowmo'){this.burst(0.5,0.4,2400);this.tone(300,0.55,'sine',0.22,0,50);this.tone(90,0.6,'triangle',0.2,0.02,40);}
     if(type==='end'){[660,550,440,330].forEach((f,i)=>this.tone(f,0.24,'sine',0.12,i*0.12));}
   }
 }
